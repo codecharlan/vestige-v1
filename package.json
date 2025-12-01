@@ -1,0 +1,184 @@
+{
+    "name": "vestige",
+    "displayName": "Vestige - Temporal Code Intelligence",
+    "description": "Uncover the traces of your codebase through time. Inline temporal linting that reveals code age, churn, and evolution.",
+    "version": "0.1.0",
+    "publisher": "vestige",
+    "icon": "images/icon.png",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": [
+        "Linters",
+        "Visualization",
+        "Other"
+    ],
+    "keywords": [
+        "git",
+        "temporal",
+        "history",
+        "code age",
+        "archaeology"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "vestige.analyze",
+                "title": "Vestige: Analyze Current File"
+            },
+            {
+                "command": "vestige.showTimeline",
+                "title": "Vestige: Show File Timeline"
+            },
+            {
+                "command": "vestige.toggle",
+                "title": "Vestige: Toggle Annotations"
+            },
+            {
+                "command": "vestige.clearCache",
+                "title": "Vestige: Clear Cache"
+            },
+            {
+                "command": "vestige.showEvolution",
+                "title": "Vestige: Show Code Evolution"
+            },
+            {
+                "command": "vestige.showGraveyard",
+                "title": "Vestige: Show Code Graveyard"
+            },
+            {
+                "command": "vestige.showDashboard",
+                "title": "Vestige: Show Team Dashboard"
+            },
+            {
+                "command": "vestige.showAchievements",
+                "title": "Vestige: Show Achievements"
+            },
+            {
+                "command": "vestige.showDebt",
+                "title": "Vestige: Show Technical Debt 📉"
+            },
+            {
+                "command": "vestige.showBugs",
+                "title": "Vestige: Show Bug Analysis 🐛"
+            },
+            {
+                "command": "vestige.showZombies",
+                "title": "Vestige: Show Zombie Code 🧟"
+            },
+            {
+                "command": "vestige.rewind",
+                "title": "Vestige: Rewind Workspace ⏪"
+            },
+            {
+                "command": "vestige.stopRewind",
+                "title": "Vestige: Stop Rewind ⏩"
+            },
+            {
+                "command": "vestige.showLeaderboard",
+                "title": "Vestige: Show Leaderboard 🏆"
+            },
+            {
+                "command": "vestige.showPerformance",
+                "title": "Vestige: Show Performance Timeline ⚡"
+            },
+            {
+                "command": "vestige.showFlow",
+                "title": "Vestige: Show Code Flow 🌊"
+            },
+            {
+                "command": "vestige.checkDrift",
+                "title": "Vestige: Check Documentation Drift 📚"
+            },
+            {
+                "command": "vestige.checkHotPotato",
+                "title": "Vestige: Check Hot Potato Files 🔥"
+            },
+            {
+                "command": "vestige.showLore",
+                "title": "Vestige: Show Lore Decisions 📜"
+            },
+            {
+                "command": "vestige.aiHistorian",
+                "title": "Vestige: AI Code Historian 💬"
+            },
+            {
+                "command": "vestige.addDecision",
+                "title": "Vestige: Add Lore Decision ➕"
+            }
+        ],
+        "configuration": {
+            "title": "Vestige",
+            "properties": {
+                "vestige.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable Vestige temporal annotations"
+                },
+                "vestige.churnThreshold": {
+                    "type": "number",
+                    "default": 10,
+                    "description": "Number of changes to mark as high churn (🔥)"
+                },
+                "vestige.fossilThreshold": {
+                    "type": "number",
+                    "default": 365,
+                    "description": "Days since last change to mark as fossil (🗿)"
+                },
+                "vestige.showInlineAnnotations": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show inline temporal annotations"
+                },
+                "vestige.openaiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API key for AI commit explanations (optional)"
+                },
+                "vestige.zombieAgeDays": {
+                    "type": "number",
+                    "default": 365,
+                    "description": "Days of inactivity to mark code as Zombie (🧟)"
+                },
+                "vestige.driftDays": {
+                    "type": "number",
+                    "default": 30,
+                    "description": "Days of drift between code and docs to trigger alert (📚)"
+                },
+                "vestige.hotPotatoAuthors": {
+                    "type": "number",
+                    "default": 5,
+                    "description": "Number of distinct authors to mark as Hot Potato (🔥)"
+                }
+            }
+        },
+        "views": {
+            "explorer": [
+                {
+                    "id": "vestige.graveyard",
+                    "name": "💀 Code Graveyard"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "lint": "eslint .",
+        "pretest": "npm run lint",
+        "test": "node ./test/runTest.js"
+    },
+    "dependencies": {
+        "simple-git": "^3.19.1"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.80.0",
+        "@types/node": "^20.x",
+        "eslint": "^8.47.0",
+        "mocha": "^10.2.0",
+        "@vscode/test-electron": "^2.3.4",
+        "glob": "^10.3.3"
+    }
+}
