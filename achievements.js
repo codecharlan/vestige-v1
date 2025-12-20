@@ -36,6 +36,30 @@ const ACHIEVEMENTS = {
         name: '🏛️ Master Archaeologist',
         description: 'Unlock all achievements',
         requirement: 1
+    },
+    LORE_KEEPER: {
+        id: 'lore_keeper',
+        name: '📜 Lore Keeper',
+        description: 'Document 10+ architectural decisions',
+        requirement: 10
+    },
+    ORIGINALITY_KING: {
+        id: 'originality_king',
+        name: '👑 Originality King',
+        description: 'Maintain 95%+ originality in a large file',
+        requirement: 1
+    },
+    ZOMBIE_SLAYER: {
+        id: 'zombie_slayer',
+        name: '⚔️ Zombie Slayer',
+        description: 'Keep a high-churn file free of zombies',
+        requirement: 1
+    },
+    BUS_DRIVER: {
+        id: 'bus_driver',
+        name: '🚌 Bus Driver',
+        description: 'Eliminate Bus Factor risks in a team file',
+        requirement: 1
     }
 };
 
@@ -62,53 +86,42 @@ class AchievementSystem {
         return this.storage.get('vestige.unlocked') || [];
     }
 
-    async checkAchievements(actionType, count) {
+    async checkAchievements(actionType, count, analysis = null) {
         const unlocked = this.getUnlocked();
-
-        // Map actions to achievements
         const actionMap = {
-            'viewOldFile': { achievement: ACHIEVEMENTS.FOSSIL_HUNTER, threshold: 5 * 365 },
+            'viewOldFile': ACHIEVEMENTS.FOSSIL_HUNTER,
             'useEvolution': ACHIEVEMENTS.TIME_TRAVELER,
             'viewGraveyard': ACHIEVEMENTS.GRAVEDIGGER,
             'editBusFactor1': ACHIEVEMENTS.TEAM_PLAYER,
-            'viewDashboard': ACHIEVEMENTS.DATA_SCIENTIST
+            'viewDashboard': ACHIEVEMENTS.DATA_SCIENTIST,
+            'loreAdded': ACHIEVEMENTS.LORE_KEEPER
+        };
+
+        const checkUnlock = async (achievement, threshold = null) => {
+            if (unlocked.includes(achievement.id)) return;
+            const actualCount = threshold !== null ? threshold : count;
+            if (actualCount >= achievement.requirement) {
+                unlocked.push(achievement.id);
+                await this.storage.update('vestige.unlocked', unlocked);
+                vscode.window.showInformationMessage(`🎉 Achievement Unlocked: ${achievement.name}`);
+            }
         };
 
         const mapping = actionMap[actionType];
-        if (!mapping) return;
+        if (mapping) await checkUnlock(mapping);
 
-        const achievement = mapping.achievement || mapping;
-
-        if (unlocked.includes(achievement.id)) return;
-
-        // Check if requirement met
-        if (count >= achievement.requirement) {
-            unlocked.push(achievement.id);
-            await this.storage.update('vestige.unlocked', unlocked);
-            newUnlock = achievement;
-
-            // Show notification
-            vscode.window.showInformationMessage(
-                `🎉 Achievement Unlocked: ${achievement.name}`,
-                'View Achievements'
-            ).then(selection => {
-                if (selection === 'View Achievements') {
-                    vscode.commands.executeCommand('vestige.showAchievements');
-                }
-            });
+        // Elite: Analysis-based triggers
+        if (analysis) {
+            if (analysis.originalityIndex >= 95 && analysis.churn.totalLines > 500) await checkUnlock(ACHIEVEMENTS.ORIGINALITY_KING);
+            if (analysis.zombieMethods && analysis.zombieMethods.length === 0 && analysis.churn.totalCommits > 50) await checkUnlock(ACHIEVEMENTS.ZOMBIE_SLAYER);
+            if (analysis.ownershipHeat && !analysis.ownershipHeat.isBusRisk && analysis.churn.totalAuthors > 3) await checkUnlock(ACHIEVEMENTS.BUS_DRIVER);
         }
 
-        // Check for master achievement
-        if (unlocked.length === Object.keys(ACHIEVEMENTS).length - 1) {
-            if (!unlocked.includes(ACHIEVEMENTS.ARCHAEOLOGIST.id)) {
-                unlocked.push(ACHIEVEMENTS.ARCHAEOLOGIST.id);
-                await this.storage.update('vestige.unlocked', unlocked);
-
-                vscode.window.showInformationMessage(
-                    `🏆 MASTER ACHIEVEMENT: ${ACHIEVEMENTS.ARCHAEOLOGIST.name}!`,
-                    'Amazing!'
-                );
-            }
+        // Master check
+        if (unlocked.length >= Object.keys(ACHIEVEMENTS).length - 1 && !unlocked.includes(ACHIEVEMENTS.ARCHAEOLOGIST.id)) {
+            unlocked.push(ACHIEVEMENTS.ARCHAEOLOGIST.id);
+            await this.storage.update('vestige.unlocked', unlocked);
+            vscode.window.showInformationMessage(`🏆 MASTER ARCHAEOLOGIST: ${ACHIEVEMENTS.ARCHAEOLOGIST.name}`);
         }
     }
 

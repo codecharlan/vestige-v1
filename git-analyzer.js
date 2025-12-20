@@ -2,40 +2,19 @@ const simpleGit = require('simple-git');
 const path = require('path');
 const vscode = require('vscode');
 
+const LORE_PATTERNS = [
+    { pattern: /Architecture:|Design:|Structure:/i, type: 'architecture' },
+    { pattern: /Decided to:|Decision:|We will:/i, type: 'decision' },
+    { pattern: /Reasoning:|Why:|Rationale:/i, type: 'rationale' },
+    { pattern: /Caution:|Warning:|Note:/i, type: 'warning' },
+    { pattern: /Vendor:|Dependency:|replaced \w+ with \w+/i, type: 'pivot' }
+];
+
 class GitAnalyzer {
     constructor() {
         this.git = simpleGit();
     }
 
-    async analyzeFile(repoPath, filePath) {
-        try {
-            const git = simpleGit(repoPath);
-            const relativePath = path.relative(repoPath, filePath);
-
-            // Check if file is tracked
-            try {
-                await git.raw(['ls-files', '--error-unmatch', relativePath]);
-            } catch (e) {
-                throw new Error('File is not tracked by git');
-            }
-
-            // Get blame data
-            // Use -w to ignore whitespace changes if desired, but standard is better for accuracy
-            const blame = await git.raw(['blame', '--line-porcelain', relativePath]);
-            const lines = this.parseBlame(blame);
-
-            // Calculate metrics
-            const churn = await this.calculateChurn(git, relativePath);
-
-            return {
-                lines,
-                churn
-            };
-        } catch (error) {
-            console.error('Git analysis failed:', error);
-            throw error;
-        }
-    }
 
     parseBlame(blameOutput) {
         const lines = [];
@@ -631,6 +610,629 @@ class GitAnalyzer {
             console.error('Hot potato detection failed', e);
             return [];
         }
+    }
+    /**
+     * Elite: Calculate Originality Index
+     * Percentage of code older than 2 years
+     */
+    calculateOriginalityIndex(lines) {
+        if (!lines || lines.length === 0) return 100;
+        const twoYearsAgo = new Date();
+        twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+
+        const originalLines = lines.filter(l => l.date < twoYearsAgo).length;
+        return Math.round((originalLines / lines.length) * 100);
+    }
+
+    /**
+     * Elite: Interest Rate Engine
+     * Score based on Churn * Complexity
+     */
+    calculateInterestRate(churnCount, lineCount) {
+        // Line count is a proxy for complexity in VS Code
+        // Normalizing: 500 lines * 10 commits = 5000 / 100 = 50%
+        return Math.min(100, Math.round((churnCount * lineCount) / 100));
+    }
+
+    /**
+     * Elite: Predictive Conflict Heatmap
+     * Finds files modified in other branches
+     */
+    async checkPredictiveConflicts(repoPath, filePath) {
+        const git = simpleGit(repoPath);
+        const relativePath = path.relative(repoPath, filePath);
+        try {
+            // git log --branches --not HEAD --pretty=format:%D -n 5 -- <file>
+            const output = await git.raw(['log', '--branches', '--not', 'HEAD', '--pretty=format:%D', '-n', '5', '--', relativePath]);
+            return output.split('\n').filter(l => l.trim()).map(l => l.trim());
+        } catch (e) {
+            return [];
+        }
+    }
+
+    /**
+     * Elite: Knowledge Proximity Graph Data
+     */
+    async findKnowledgeProximity(repoPath, filePath) {
+        const git = simpleGit(repoPath);
+        const relativePath = path.relative(repoPath, filePath);
+        const neighbors = new Map();
+
+        try {
+            const hashes = (await git.raw(['log', '-n', '10', '--pretty=format:%H', '--', relativePath])).split('\n').filter(h => h);
+
+            for (const hash of hashes) {
+                const show = await git.raw(['show', '--pretty=format:%an', '--name-only', hash]);
+                const parts = show.split('\n');
+                const author = parts[0];
+                const files = parts.slice(1);
+
+                if (files.some(f => f && f !== relativePath)) {
+                    neighbors.set(author, (neighbors.get(author) || 0) + 1);
+                }
+            }
+        } catch (e) {
+            console.error('Proximity analysis failed', e);
+        }
+
+        return Array.from(neighbors.entries())
+            .map(([name, strength]) => ({ name, strength }))
+            .sort((a, b) => b.strength - a.strength);
+    }
+
+    /**
+     * Elite: Generate Narrative Biography (Synthesized)
+     */
+    generateNarrativeBiography(analysis) {
+        const { lines, churn, originalityIndex, stability, implicitLore = [] } = analysis;
+
+        let story = `This file has been active since ${lines.summary?.firstCommit?.date ? new Date(lines.summary.firstCommit.date).toDateString() : 'unknown'}. `;
+        story += `It has evolved through ${churn.totalCommits} changes by ${churn.summary?.authors?.length || 0} authors. `;
+
+        if (originalityIndex > 80) {
+            story += `It preserves a high degree of its ancestral structure (${originalityIndex}% original). `;
+        } else {
+            story += `It has undergone significant metamorphosis, with only ${originalityIndex}% of the founding logic remaining. `;
+        }
+
+        const pivots = implicitLore.filter(l => l.type === 'pivot');
+        if (pivots.length > 0) {
+            story += `Notable architectural pivots include: ${pivots.slice(0, 2).map(p => p.content).join('; ')}. `;
+        }
+
+        const decisions = implicitLore.filter(l => l.type === 'decision' || l.type === 'architecture');
+        if (decisions.length > 0) {
+            story += `Implicit decisions found in history suggest a focus on: ${decisions.slice(0, 2).map(d => d.content).join(', ')}. `;
+        }
+
+        if (stability > 90) {
+            story += `Currently, the file is in a Zenith State of high stability.`;
+        } else if (stability < 30) {
+            story += `The file is currently in a high-entropy state with frequent churn.`;
+        }
+
+        return story;
+    }
+
+    /**
+     * Elite: Implicit Lore Extraction
+     */
+    async extractImplicitLore(git, relativePath) {
+        const lore = [];
+        const log = await git.log({ file: relativePath, n: 50 });
+
+        for (const entry of log.all) {
+            for (const { pattern, type } of LORE_PATTERNS) {
+                if (pattern.test(entry.message)) {
+                    // Extract the text after the pattern
+                    const match = entry.message.match(pattern);
+                    const startIndex = match.index + match[0].length;
+                    const content = entry.message.substring(startIndex).trim().split('\n')[0];
+
+                    if (content.length > 5) {
+                        lore.push({
+                            type,
+                            content,
+                            author: entry.author_name,
+                            date: new Date(entry.date),
+                            hash: entry.hash
+                        });
+                    }
+                }
+            }
+        }
+        return lore;
+    }
+
+    /**
+     * Elite: Shadow Lore (Reversion Detection)
+     */
+    async detectShadowLore(git, relativePath) {
+        const shadows = [];
+        const log = await git.log({ file: relativePath });
+
+        const reverts = log.all.filter(e => /revert|undo|back out/i.test(e.message));
+        for (const rev of reverts) {
+            shadows.push({
+                type: 'reversion',
+                content: `Pattern Reverted: ${rev.message.split('\n')[0]}`,
+                author: rev.author_name,
+                date: new Date(rev.date),
+                hash: rev.hash
+            });
+        }
+        return shadows;
+    }
+
+    /**
+     * Elite: Calculate Refactor Safety Score
+     * 0-100: Higher is safer. Reversions and high historical debt lower this score.
+     */
+    calculateSafetyScore(analysis) {
+        let score = 100;
+        const { implicitLore = [], churn, interestRate } = analysis;
+
+        // Penalize for reversions
+        const reversions = (implicitLore || []).filter(l => l.type === 'reversion').length;
+        score -= (reversions * 20);
+
+        // Penalize for high interest rate (existing debt)
+        score -= (interestRate / 2);
+
+        // Penalize for high author churn (lack of single ownership)
+        if (churn.authors && churn.authors.length > 5) score -= 15;
+
+        return Math.max(0, Math.min(100, score));
+    }
+
+    /**
+     * Elite: Calculate Refactor ROI
+     * High score means this file is a high-priority refactor candidate.
+     */
+    calculateRefactorROI(analysis) {
+        const { interestRate, churn, stability } = analysis;
+
+        // High interest (cost of debt) + High activity (future friction) + Low stability = High ROI
+        let roi = (interestRate * 0.4) + (churn.totalCommits * 0.4) + (100 - (stability || 0)) * 0.2;
+
+        return Math.floor(Math.min(100, roi));
+    }
+
+    /**
+     * Elite: Predict PR Risk
+     * Analyzes if recent patterns match historical bug hotspots
+     */
+    predictRisk(analysis) {
+        const { interestRate, churn, stability } = analysis;
+        let risk = (100 - (stability || 0)) * 0.5 + (interestRate * 0.3) + (churn.totalCommits * 0.2);
+
+        // Normalize to a 0-10 scale for UI badges
+        return Math.min(10, Math.floor(risk / 10));
+    }
+
+    /**
+     * Elite: Identify Fossil Zones
+     * Returns line ranges that haven't been touched in >500 days
+     */
+    identifyFossilZones(lines) {
+        const fossils = [];
+        const threshold = 500 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        let currentRange = null;
+        lines.forEach((line, index) => {
+            const age = now - new Date(line.date).getTime();
+            if (age > threshold) {
+                if (!currentRange) {
+                    currentRange = { start: index + 1, end: index + 1, author: line.author };
+                } else if (currentRange.author === line.author) {
+                    currentRange.end = index + 1;
+                } else {
+                    fossils.push(currentRange);
+                    currentRange = { start: index + 1, end: index + 1, author: line.author };
+                }
+            } else if (currentRange) {
+                fossils.push(currentRange);
+                currentRange = null;
+            }
+        });
+        if (currentRange) fossils.push(currentRange);
+        return fossils;
+    }
+
+    /**
+     * Elite: Calculate Knowledge Gaps (Tribal Knowledge)
+     * Identifies if the owners of specific blocks are still "active"
+     */
+    calculateKnowledgeGaps(analysis) {
+        const gaps = [];
+        const { lines, churn } = analysis;
+        const activeAuthors = new Set(churn.authors.slice(0, 3).map(a => a.name)); // Simplified: Top 3 are "active"
+
+        // Find blocks owned by non-active authors
+        let currentGap = null;
+        lines.forEach((line, index) => {
+            if (!activeAuthors.has(line.author)) {
+                if (!currentGap) {
+                    currentGap = { start: index + 1, end: index + 1, author: line.author };
+                } else if (currentGap.author === line.author) {
+                    currentGap.end = index + 1;
+                } else {
+                    gaps.push(currentGap);
+                    currentGap = { start: index + 1, end: index + 1, author: line.author };
+                }
+            } else if (currentGap) {
+                gaps.push(currentGap);
+                currentGap = null;
+            }
+        });
+        if (currentGap) gaps.push(currentGap);
+        return gaps;
+    }
+
+    /**
+     * Elite: Detect Zenith State
+     * High Stability + High Originality + Low Churn
+     */
+    detectZenithState(analysis) {
+        const { stability, originalityIndex, churn } = analysis;
+        return (stability > 90 && originalityIndex > 80 && churn.totalCommits < 20);
+    }
+
+    /**
+     * Elite: Extract Echoed Reviews
+     * Scans history for PR discussions or review-like comments in commits
+     */
+    async extractEchoedReviews(git, relativePath) {
+        const reviews = [];
+        try {
+            const log = await git.log({ file: relativePath });
+            // Look for "PR #123", "Review:", "Notes:", etc.
+            const reviewCommits = log.all.filter(c => /PR #?\d+|review:|approved by|notes:/i.test(c.message));
+
+            reviewCommits.forEach(c => {
+                reviews.push({
+                    author: c.author_name,
+                    date: new Date(c.date),
+                    content: c.message.split('\n').slice(1).join('\n').trim() || c.message.split('\n')[0],
+                    hash: c.hash
+                });
+            });
+        } catch (e) { console.error('Echoed Reviews error:', e); }
+        return reviews;
+    }
+
+    /**
+     * Elite: Generate Onboarding Tour
+     * Identifies key historical turning points
+     */
+    generateOnboardingTour(analysis) {
+        const { lines = [], churn } = analysis;
+        const milestones = [];
+
+        // 1. First commit
+        if (lines.length > 0) {
+            milestones.push({
+                type: 'birth',
+                date: lines[lines.length - 1].date,
+                content: `File created by ${lines[lines.length - 1].author}.`
+            });
+        }
+
+        // 2. High Churn Epochs (major refactors)
+        if (analysis.epochs) {
+            analysis.epochs.slice(0, 2).forEach(e => {
+                milestones.push({
+                    type: 'epoch',
+                    content: `Major Era: ${e.name} (${e.period})`
+                });
+            });
+        }
+
+        return milestones;
+    }
+
+    /**
+     * Elite: Calculate Detailed Debt Interest
+     * Quantifies cumulative churn on code > 1 year old
+     */
+    calculateDetailedDebtInterest(lines, churn) {
+        const threshold = 365 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const oldLines = lines.filter(l => (now - new Date(l.date).getTime()) > threshold).length;
+        const ratio = lines.length > 0 ? oldLines / lines.length : 0;
+
+        // Interest = Churn * Ratio of Legacy Code
+        return Math.floor(churn.totalCommits * ratio * 5); // Heuristic score
+    }
+
+    /**
+     * Elite: Check Architectural Drift
+     * Validates if recent changes align with inferred patterns
+     */
+    checkArchitecturalDrift(analysis) {
+        const { emergingPatterns = [], churn } = analysis;
+        if (emergingPatterns.length > 0 && churn.totalCommits > 50) {
+            // If high churn but no new patterns found recently, potential drift
+            return {
+                level: 'warning',
+                message: 'Structural evolution has stalled. Recent changes may be deviating from established patterns.'
+            };
+        }
+        return null;
+    }
+
+    /**
+     * Elite: Calculate Developer Reputation
+     * Heuristic based on Zenith ownership and contribution quality
+     */
+    calculateDeveloperReputation(analysis) {
+        let score = 0;
+        const { isZenith, ownership, originalityIndex } = analysis;
+
+        if (isZenith) score += 50;
+        if (originalityIndex > 50) score += 20;
+        if (ownership && ownership.percent > 50) score += 10;
+
+        return score;
+    }
+
+    /**
+     * Elite: Generate Evolutionary Badges
+     */
+    generateEvolutionaryBadges(analysis) {
+        const badges = [];
+        const { isZenith, churn, originalityIndex, safetyScore } = analysis;
+
+        if (isZenith) badges.push({ id: 'zenith_master', label: '🏆 Zenith Master', color: '#FBBF24' });
+        if (churn.totalCommits > 100) badges.push({ id: 'battle_hardened', label: '🛡️ Battle Hardened', color: '#60A5FA' });
+        if (originalityIndex > 90) badges.push({ id: 'first_ancestor', label: '🗿 First Ancestor', color: '#94A3B8' });
+        if (safetyScore > 90) badges.push({ id: 'guardian', label: '🛡️ Guardian', color: '#69f0ae' });
+
+        return badges;
+    }
+
+    /**
+     * Elite: Pattern Mining (Heuristic)
+     * Detects repeated structural blocks that might be "Implicit Standards"
+     */
+    async detectEmergingPatterns(repoPath, filePath) {
+        const patterns = [];
+        try {
+            const fs = require('fs');
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
+
+            // Find repeated line sequences (length 2-4)
+            const map = new Map();
+            for (let i = 0; i < lines.length - 2; i++) {
+                const chunk = lines.slice(i, i + 3).map(l => l.trim()).join(' ');
+                if (chunk.length > 20) {
+                    map.set(chunk, (map.get(chunk) || 0) + 1);
+                }
+            }
+
+            map.forEach((count, chunk) => {
+                if (count >= 3) {
+                    patterns.push({
+                        type: 'standard',
+                        content: `Emerging Pattern Detected (${count} occurrences): "${chunk.substring(0, 40)}..."`,
+                        author: 'Structural Analysis',
+                        date: new Date(),
+                        hash: 'HEAD'
+                    });
+                }
+            });
+        } catch (e) { }
+        return patterns;
+    }
+
+    /**
+     * Elite: Implicit FAQ (Comment Crawler)
+     */
+    async extractImplicitFAQ(repoPath, filePath) {
+        const lore = [];
+        try {
+            const content = require('fs').readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
+
+            const commentPatterns = [
+                { regex: /\/\/\s*why\??:\s*(.*)/i, type: 'rationale' },
+                { regex: /\/\/\s*caution:\s*(.*)/i, type: 'warning' },
+                { regex: /\/\/\s*note:\s*(.*)/i, type: 'info' },
+                { regex: /\/\/\s*fixme-lore:\s*(.*)/i, type: 'debt' }
+            ];
+
+            lines.forEach((line, index) => {
+                commentPatterns.forEach(({ regex, type }) => {
+                    const match = line.match(regex);
+                    if (match && match[1]) {
+                        lore.push({
+                            type,
+                            content: match[1].trim(),
+                            author: 'Local Source',
+                            date: new Date(),
+                            hash: 'HEAD',
+                            line: index + 1
+                        });
+                    }
+                });
+            });
+        } catch (e) { console.error('Implicit FAQ error:', e); }
+        return lore;
+    }
+
+    /**
+     * Elite: Dependency Pulse (Vendor Pivots)
+     */
+    async detectVendorPivots(git, repoPath) {
+        const pivots = [];
+        const packagePaths = ['package.json', 'package-lock.json', 'build.gradle', 'pom.xml'];
+        const fs = require('fs');
+
+        for (const p of packagePaths) {
+            try {
+                const fullPath = path.join(repoPath, p);
+                if (fs.existsSync(fullPath)) {
+                    const log = await git.log({ file: p, n: 10 });
+                    for (const entry of log.all) {
+                        if (/add|remove|replace|update|switch|vendor|lib/i.test(entry.message)) {
+                            pivots.push({
+                                type: 'pivot',
+                                content: `Dependency Shift in ${p}: ${entry.message.split('\n')[0]}`,
+                                author: entry.author_name,
+                                date: new Date(entry.date),
+                                hash: entry.hash
+                            });
+                        }
+                    }
+                }
+            } catch (e) { }
+        }
+        return pivots;
+    }
+
+    /**
+     * Master Analysis Engine: Orchestrates all temporal and structural insights
+     */
+    async analyzeFile(repoPath, filePath) {
+        const git = simpleGit(repoPath);
+        const relativePath = path.relative(repoPath, filePath);
+
+        // Tracked check
+        try {
+            await git.raw(['ls-files', '--error-unmatch', relativePath]);
+        } catch (e) {
+            throw new Error('File is not tracked by git');
+        }
+
+        const lines = await this.getFileTimeline(repoPath, filePath);
+        const churn = await this.calculateChurn(git, relativePath);
+
+        const originality = this.calculateOriginalityIndex(lines);
+        const interest = this.calculateInterestRate(churn);
+        const conflicts = await this.checkPredictiveConflicts(repoPath, filePath);
+        const graph = await this.findKnowledgeProximity(repoPath, filePath);
+        const shadows = await this.findRecentDeletions(repoPath, filePath);
+
+        // Elite AI: Automated Lore Suite
+        const implicitLore = await this.extractImplicitLore(git, relativePath);
+        const shadowLore = await this.detectShadowLore(git, relativePath);
+        const implicitFAQ = await this.extractImplicitFAQ(repoPath, filePath);
+        const vendorPivots = await this.detectVendorPivots(git, repoPath);
+        const emergingPatterns = await this.detectEmergingPatterns(repoPath, filePath);
+
+        const heat = this.calculateOwnershipHeat({
+            churn,
+            ownership: {
+                percent: churn.authors ? (churn.authors.length > 0 ? churn.authors[0].percent : 0) : 0
+            }
+        });
+        const bio = this.generateNarrativeBiography({
+            lines, churn, originalityIndex: originality,
+            stability: Math.max(0, 100 - churn.totalCommits),
+            implicitLore: [...implicitLore, ...shadowLore, ...implicitFAQ, ...vendorPivots, ...emergingPatterns]
+        });
+
+        return {
+            lines,
+            churn,
+            originalityIndex: originality,
+            interestRate: interest,
+            predictiveConflicts: conflicts,
+            knowledgeNeighbors: graph,
+            narrativeBiography: bio,
+            ownershipHeat: heat,
+            deletedChunks: shadows,
+            stability: Math.max(0, 100 - churn.totalCommits),
+            implicitLore: [...implicitLore, ...shadowLore, ...implicitFAQ, ...vendorPivots, ...emergingPatterns],
+            repoPath,
+            safetyScore: this.calculateSafetyScore({ implicitLore: [...implicitLore, ...shadowLore, ...implicitFAQ, ...vendorPivots, ...emergingPatterns], churn, interestRate: interest }),
+            refactorROI: this.calculateRefactorROI({ interestRate: interest, churn, stability: Math.max(0, 100 - churn.totalCommits) }),
+            prRisk: this.predictRisk({ interestRate: interest, churn, stability: Math.max(0, 100 - churn.totalCommits) }),
+            fossilZones: this.identifyFossilZones(lines),
+            knowledgeGaps: this.calculateKnowledgeGaps({ lines, churn }),
+            isZenith: this.detectZenithState({ stability: Math.max(0, 100 - churn.totalCommits), originalityIndex: originality, churn }),
+            echoedReviews: await this.extractEchoedReviews(git, relativePath),
+            onboardingTour: this.generateOnboardingTour({ lines, churn, epochs: [] }),
+            debtInterest: this.calculateDetailedDebtInterest(lines, churn),
+            archDrift: this.checkArchitecturalDrift({ emergingPatterns, churn }),
+            reputation: this.calculateDeveloperReputation({ isZenith: this.detectZenithState({ stability: Math.max(0, 100 - churn.totalCommits), originalityIndex: originality, churn }), ownership: { percent: churn.authors && churn.authors.length > 0 ? churn.authors[0].percent : 0 }, originalityIndex: originality }),
+            badges: this.generateEvolutionaryBadges({ isZenith: this.detectZenithState({ stability: Math.max(0, 100 - churn.totalCommits), originalityIndex: originality, churn }), churn, originalityIndex: originality, safetyScore: this.calculateSafetyScore({ implicitLore: [], churn, interestRate: interest }) }),
+            ownership: {
+                topAuthor: churn.authors && churn.authors.length > 0 ? churn.authors[0].name : 'Unknown',
+                percent: churn.authors && churn.authors.length > 0 ? churn.authors[0].percent : 0
+            }
+        };
+    }
+
+    /**
+     * Elite: Calculate Ownership Heat
+     */
+    calculateOwnershipHeat(analysis) {
+        const authors = analysis.churn.totalAuthors || 0;
+        const topOwnerPercent = analysis.ownership?.percent || 0;
+        const isBusRisk = topOwnerPercent > 80 && authors > 1;
+        const isHotPotato = authors >= 5 && topOwnerPercent < 30;
+        return { isBusRisk, isHotPotato, topOwnerPercent, authors };
+    }
+
+    /**
+     * Elite: Find Recent Deletions (Ghost Shadows)
+     */
+    async findRecentDeletions(repoPath, filePath) {
+        const git = simpleGit(repoPath);
+        const relativePath = path.relative(repoPath, filePath);
+        const deletions = [];
+
+        try {
+            const patch = await git.raw(['log', '-p', '--since=30 days ago', '--', relativePath]);
+            const patchLines = patch.split('\n');
+
+            let currentHash = '';
+            let currentAuthor = '';
+            let currentLine = 0;
+            let inHunk = false;
+            let deletedLines = [];
+
+            for (const line of patchLines) {
+                if (line.startsWith('commit ')) {
+                    currentHash = line.substring(7);
+                    inHunk = false;
+                } else if (line.startsWith('Author: ')) {
+                    currentAuthor = line.substring(8);
+                } else if (line.startsWith('@@ ')) {
+                    const match = line.match(/@@ -\d+,\d+ \+(\d+),\d+ @@/);
+                    if (match) {
+                        currentLine = parseInt(match[1]);
+                        inHunk = true;
+                        if (deletedLines.length > 0) {
+                            deletions.push({
+                                line: currentLine,
+                                content: deletedLines.join('\n'),
+                                author: currentAuthor,
+                                hash: currentHash
+                            });
+                            deletedLines = [];
+                        }
+                    }
+                } else if (inHunk && line.startsWith('-') && !line.startsWith('---')) {
+                    deletedLines.push(line.substring(1));
+                }
+            }
+
+            if (deletedLines.length > 0) {
+                deletions.push({
+                    line: currentLine,
+                    content: deletedLines.join('\n'),
+                    author: currentAuthor,
+                    hash: currentHash
+                });
+            }
+        } catch (e) {
+            console.error('Ghost shadow detection failed', e);
+        }
+        return deletions;
     }
 }
 

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/icon.png" width="160" alt="Vestige Logo">
+</p>
+
 # 🗿 Vestige - Temporal Code Intelligence
 
 > *Uncover the traces of your codebase through time*

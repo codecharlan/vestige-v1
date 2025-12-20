@@ -3,7 +3,7 @@
     "displayName": "Vestige - Temporal Code Intelligence",
     "description": "Uncover the traces of your codebase through time. Inline temporal linting that reveals code age, churn, and evolution.",
     "version": "0.1.0",
-    "publisher": "vestige",
+    "publisher": "codecharlan",
     "icon": "images/icon.png",
     "engines": {
         "vscode": "^1.80.0"

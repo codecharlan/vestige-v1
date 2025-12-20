@@ -5,30 +5,34 @@ class TimelinePanel {
     constructor(context) {
         this.context = context;
         this.panel = null;
+        this.currentFileName = '';
     }
 
-    /**
-     * Update the timeline panel if it's visible
-     */
-    update(timeline, epochs, busFactor, decisions) {
+    getROIColor(roi) {
+        if (roi > 70) return '#ff5252';
+        if (roi > 40) return '#ffd740';
+        return '#69f0ae';
+    }
+
+    getSafetyColor(score) {
+        if (score > 70) return '#69f0ae';
+        if (score > 40) return '#ffd740';
+        return '#ff5252';
+    }
+
+    update(analysis, epochs, busFactor, decisions) {
         if (this.panel && this.panel.visible) {
-            // Merge extra data into timeline object for getWebviewContent
-            timeline.epochs = epochs;
-            timeline.busFactor = busFactor;
-            timeline.decisions = decisions;
-            this.panel.webview.html = this.getWebviewContent(timeline, this.currentFileName);
+            analysis.epochs = epochs;
+            analysis.busFactor = busFactor;
+            analysis.decisions = decisions;
+            this.panel.webview.html = this.getWebviewContent(analysis, this.currentFileName);
         }
     }
 
-    /**
-     * Show the timeline panel
-     */
-    show(timeline, filePath, decisions = []) {
+    show(analysis, filePath, decisions = []) {
         const fileName = path.basename(filePath);
         this.currentFileName = fileName;
-
-        // Attach decisions to timeline for rendering
-        timeline.decisions = decisions;
+        analysis.decisions = decisions;
 
         if (this.panel) {
             this.panel.reveal(vscode.ViewColumn.Two);
@@ -37,52 +41,33 @@ class TimelinePanel {
                 'vestige.timeline',
                 `Vestige Timeline: ${fileName}`,
                 vscode.ViewColumn.Two,
-                {
-                    enableScripts: true,
-                    retainContextWhenHidden: true
+                { enableScripts: true, retainContextWhenHidden: true }
+            );
+
+            this.panel.webview.onDidReceiveMessage(message => {
+                switch (message.command) {
+                    case 'viewCommit':
+                        vscode.commands.executeCommand('vestige.openFileAtCommit', message.hash, fileName, analysis.repoPath);
+                        break;
+                    case 'promoteLore':
+                        vscode.commands.executeCommand('vestige.promoteLore', message.type, message.content, message.hash, analysis.repoPath, fileName);
+                        break;
                 }
-            );
-
-            this.panel.webview.onDidReceiveMessage(
-                message => {
-                    switch (message.command) {
-                        case 'viewCommit':
-                            vscode.commands.executeCommand(
-                                'vestige.openFileAtCommit',
-                                message.hash,
-                                fileName,
-                                timeline.repoPath
-                            );
-                            return;
-                        case 'viewDecision':
-                            vscode.commands.executeCommand(
-                                'vestige.showLore' // We can reuse this or make it specific
-                            );
-                            return;
-                    }
-                },
-                null,
-                this.context.subscriptions
-            );
-
-            this.panel.onDidDispose(() => {
-                this.panel = null;
             });
+
+            this.panel.onDidDispose(() => { this.panel = null; });
         }
 
-        this.panel.webview.html = this.getWebviewContent(timeline, fileName);
+        this.panel.webview.html = this.getWebviewContent(analysis, fileName);
     }
 
-    /**
-     * Generate the HTML content for the webview
-     */
-    getWebviewContent(timeline, fileName) {
-        const commits = timeline.commits;
-        const summary = timeline.summary;
-        const coupling = timeline.coupling || [];
-        const epochs = timeline.epochs || [];
-        const busFactor = timeline.busFactor || null;
-        const decisions = timeline.decisions || [];
+    getWebviewContent(analysis, fileName) {
+        const commits = analysis.lines || []; // Using analysis.lines for commits if structure changed, or analysis.commits
+        const summary = analysis.churn || { totalCommits: 0, authors: [] };
+        const epochs = analysis.epochs || [];
+        const busFactor = analysis.busFactor || null;
+        const implicitLore = analysis.implicitLore || [];
+        const bio = analysis.narrativeBiography || 'Analyzing intelligence...';
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -91,292 +76,192 @@ class TimelinePanel {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vestige Timeline</title>
     <style>
+        :root {
+            --accent: #60A5FA;
+            --surface: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
         body {
-            font-family: var(--vscode-font-family);
+            font-family: 'Inter', -apple-system, sans-serif;
             color: var(--vscode-foreground);
             background-color: var(--vscode-editor-background);
-            padding: 20px;
+            padding: 30px;
             margin: 0;
+            line-height: 1.6;
         }
-        h1 {
-            font-size: 1.5em;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .section-header {
+            font-size: 0.85em; font-weight: 600; color: #94A3B8;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
         }
-        .summary, .coupling, .epochs, .bus-factor {
-            background: var(--vscode-textBlockQuote-background);
-            border-left: 4px solid var(--vscode-textBlockQuote-border);
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px; margin-bottom: 25px;
         }
-        .bus-factor.high-risk {
-            border-left-color: #f48771;
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            padding: 15px; border-radius: 12px; text-align: center;
         }
-        .bus-factor.medium-risk {
-            border-left-color: #f9c74f;
+        .stat-value { font-size: 1.5em; font-weight: 700; color: var(--accent); display: block; }
+        .stat-label { font-size: 0.7em; color: #94A3B8; text-transform: uppercase; }
+        
+        .bio-box {
+            background: rgba(96, 165, 250, 0.03); border-left: 3px solid var(--accent);
+            padding: 20px; border-radius: 0 12px 12px 0; margin-bottom: 30px;
+            font-style: italic; color: #E2E8F0;
         }
-        .bus-factor.low-risk {
-            border-left-color: #90be6d;
-        }
-        .summary-stat {
-            display: flex;
-            justify-content: space-between;
-            margin: 8px 0;
-        }
-        .summary-label {
-            font-weight: bold;
-            color: var(--vscode-descriptionForeground);
-        }
-        .epoch-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            margin: 4px;
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            border-radius: 12px;
-            font-size: 0.85em;
-        }
-        .timeline {
-            position: relative;
-            margin: 30px 0;
-            padding-left: 40px;
-        }
+
+        .timeline { position: relative; padding-left: 30px; }
         .timeline::before {
-            content: '';
-            position: absolute;
-            left: 15px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: var(--vscode-textSeparator-foreground);
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+            width: 2px; background: linear-gradient(to bottom, var(--accent), transparent);
+            opacity: 0.2;
         }
         .commit {
-            position: relative;
-            margin-bottom: 25px;
-            padding: 15px;
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            border-radius: 6px;
-            transition: background 0.2s;
+            background: var(--surface); border: 1px solid var(--border);
+            padding: 15px; margin-bottom: 20px; border-radius: 10px;
+            position: relative; transition: 0.2s;
         }
-        .commit:hover {
-            background: var(--vscode-list-hoverBackground);
-        }
+        .commit:hover { border-color: var(--accent); transform: translateX(5px); }
         .commit::before {
-            content: '';
-            position: absolute;
-            left: -30px;
-            top: 20px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--vscode-textLink-foreground);
-            border: 2px solid var(--vscode-editor-background);
-            z-index: 1;
+            content: ''; position: absolute; left: -34px; top: 22px;
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--accent); box-shadow: 0 0 10px var(--accent);
         }
-        .commit-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.7em; font-weight: 700; margin-right: 5px; }
+        .badge-ghost { background: rgba(126, 87, 194, 0.2); color: #9575CD; }
+        .badge-red { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
+        
+        button {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--accent); padding: 5px 12px; border-radius: 6px;
+            cursor: pointer; font-size: 0.8em; margin-top: 10px;
         }
-        .commit-hash {
-            font-family: monospace;
-            color: var(--vscode-textLink-foreground);
-            font-size: 0.9em;
-        }
-        .commit-date {
-            color: var(--vscode-descriptionForeground);
-            font-size: 0.85em;
-        }
-        .commit-author {
-            color: var(--vscode-symbolIcon-classForeground);
-            font-weight: 500;
-            margin-bottom: 5px;
-        }
-        .commit-message {
-            color: var(--vscode-foreground);
-            line-height: 1.4;
-        }
-        .no-commits {
-            text-align: center;
-            padding: 40px;
-            color: var(--vscode-descriptionForeground);
-        }
-        .author-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            border-radius: 10px;
-            font-size: 0.8em;
-            margin-right: 5px;
-        }
-        .view-btn {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            padding: 4px 8px;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 0.8em;
-            margin-top: 8px;
-        }
-        .view-btn:hover {
-            background: var(--vscode-button-hoverBackground);
-        }
-        h2 { font-size: 1.1em; margin-top: 0; }
+        button:hover { background: var(--accent); color: white; }
     </style>
 </head>
 <body>
-    <h1>
-        <span>🗿</span>
-        <span>Vestige Timeline: ${fileName}</span>
+    <h1 style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.2em;">🗿</span> Vestige Evolution
+        ${analysis.isZenith ? `
+            <span class="badge" style="background: rgba(251, 191, 36, 0.2); color: #FBBF24; margin-left: 10px; font-size: 0.6em; border: 1px solid rgba(251, 191, 36, 0.3);">
+                🏆 ZENITH STATE
+            </span>
+        ` : ''}
     </h1>
 
-    <div class="summary">
-        <div class="summary-stat">
-            <span class="summary-label">Total Commits:</span>
-            <span>${summary.total}</span>
+    <div class="section-header">📜 Narrative Biography</div>
+    <div class="bio-box">${bio}</div>
+
+    <div class="section-header">📊 Project Intelligence</div>
+    <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr);">
+        <div class="stat-card">
+            <span class="stat-value">${summary.totalCommits || commits.length}</span>
+            <span class="stat-label">Changes</span>
         </div>
-        <div class="summary-stat">
-            <span class="summary-label">Contributors:</span>
-            <span>${summary.authors.length}</span>
+        <div class="stat-card">
+            <span class="stat-value" style="color: #69f0ae;">${analysis.reputation || 0}</span>
+            <span class="stat-label">REPUTATION</span>
         </div>
-        <div class="summary-stat">
-            <span class="summary-label">First Commit:</span>
-            <span>${summary.firstCommit ? new Date(summary.firstCommit.date).toLocaleDateString() : 'N/A'}</span>
+        <div class="stat-card">
+            <span class="stat-value" style="color: ${analysis.debtInterest > 50 ? '#ff5252' : '#69f0ae'}">${analysis.debtInterest}</span>
+            <span class="stat-label">Interest</span>
         </div>
-        <div class="summary-stat">
-            <span class="summary-label">Last Commit:</span>
-            <span>${summary.lastCommit ? new Date(summary.lastCommit.date).toLocaleDateString() : 'N/A'}</span>
+        <div class="stat-card">
+            <span class="stat-value" style="color: ${this.getROIColor(analysis.refactorROI)}">${analysis.refactorROI || 0}%</span>
+            <span class="stat-label">ROI</span>
         </div>
-        <div class="summary-stat">
-            <span class="summary-label">Authors:</span>
-            <span>
-                ${summary.authors.map(a => `<span class="author-badge">${a}</span>`).join('')}
-            </span>
+        <div class="stat-card">
+            <span class="stat-value" style="color: ${this.getSafetyColor(analysis.safetyScore)}">${analysis.safetyScore || 0}%</span>
+            <span class="stat-label">Safety</span>
         </div>
     </div>
 
-    ${decisions.length > 0 ? `
-    <div class="summary" style="border-left-color: #a29bfe;">
-        <h2>📜 Lore Decisions</h2>
-        ${decisions.map(d => `
-            <div class="summary-stat" style="flex-direction: column; align-items: flex-start; margin-bottom: 10px;">
-                <div style="font-weight: bold;">${d.title}</div>
-                <div style="font-size: 0.9em; opacity: 0.8;">${d.status || 'Decided'} • ${d.date || 'No date'}</div>
-                <div style="font-size: 0.9em; margin-top: 4px;">${d.decision ? d.decision.substring(0, 100) + '...' : ''}</div>
-            </div>
-        `).join('')}
-    </div>
+    ${analysis.badges && analysis.badges.length > 0 ? `
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+            ${analysis.badges.map(b => `<span class="badge" style="background: ${b.color}33; color: ${b.color}; border: 1px solid ${b.color}66; padding: 4px 10px; font-size: 0.8em;">${b.label}</span>`).join('')}
+        </div>
     ` : ''}
 
-    ${busFactor ? `
-    <div class="bus-factor ${busFactor.risk}-risk">
-        <h2>👥 Team Health (Bus Factor)</h2>
-        <div class="summary-stat">
-            <span class="summary-label">Bus Factor:</span>
-            <span>${busFactor.busFactor} ${busFactor.busFactor === 1 ? '⚠️ HIGH RISK' : busFactor.busFactor === 2 ? '⚠️ Medium Risk' : '✅ Healthy'}</span>
+    ${analysis.archDrift ? `
+        <div class="bio-box" style="border-left-color: #ff5252; background: rgba(255, 82, 82, 0.05); margin-bottom: 20px;">
+            <strong style="color: #ff5252;">⚠️ Architectural Drift Warning</strong><br/>
+            ${analysis.archDrift.message}
         </div>
-        ${busFactor.contributors.slice(0, 3).map(c => `
-            <div class="summary-stat">
-                <span>${c.name}</span>
-                <span>${c.percent}%</span>
-            </div>
-        `).join('')}
-        ${busFactor.busFactor === 1 ? `<p style="margin-top:10px; font-size:0.9em;">⚠️ Only one person owns 50%+ of this code. Consider knowledge sharing!</p>` : ''}
-    </div>
     ` : ''}
 
-    ${epochs.length > 0 ? `
-    <div class="epochs">
-        <h2>📊 Code Seasons Detected</h2>
-        ${epochs.map(e => `
-            <span class="epoch-badge" title="${e.commits} commits">${e.name} (${e.period})</span>
-        `).join('')}
-    </div>
-    ` : ''}
-
-    ${coupling.length > 0 ? `
-    <div class="coupling">
-        <h2>🔗 Coupled Files</h2>
-        ${coupling.map(c => `
-            <div class="summary-stat">
-                <span>${c.file}</span>
-                <span class="summary-label">${c.frequency}%</span>
-            </div>
-        `).join('')}
-    </div>
-    ` : ''}
-
-    <div class="timeline">
-        ${commits.length === 0 ?
-                '<div class="no-commits">No commit history found</div>' :
-                commits.map(commit => `
-                <div class="commit">
-                    <div class="commit-header">
-                        <span class="commit-hash">${commit.hash.substring(0, 7)}</span>
-                        <span class="commit-date">${new Date(commit.date).toLocaleString()}</span>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+        <div>
+            <div class="section-header">👻 Ghost Lore</div>
+            <div class="stat-card" style="text-align: left; max-height: 200px; overflow-y: auto;">
+                ${implicitLore.length > 0 ? implicitLore.map(l => `
+                    <div style="margin-bottom: 10px; font-size: 0.85em; cursor: pointer;" onclick="promoteLore('${l.type}', '${this.escapeJs(l.content)}', '${l.hash}')">
+                        <span class="badge badge-ghost">${l.type.toUpperCase()}</span>
+                        <span style="color: #CBD5E1">"${l.content}"</span>
                     </div>
-                    <div class="commit-author">👤 ${commit.author}</div>
-                    <div class="commit-message">${this.escapeHtml(commit.message)}</div>
-                    <button class="view-btn" onclick="viewCommit('${commit.hash}')">👁️ View File at Commit</button>
+                `).join('') : '<span class="stat-label">No implicit insights</span>'}
+            </div>
+        </div>
+        <div>
+            <div class="section-header">💬 Social Echoes</div>
+            <div class="stat-card" style="text-align: left; max-height: 200px; overflow-y: auto;">
+                ${analysis.echoedReviews && analysis.echoedReviews.length > 0 ? analysis.echoedReviews.map(r => `
+                    <div style="margin-bottom: 10px; font-size: 0.85em;">
+                        <div style="color: #94A3B8; font-size: 0.8em;">${r.author} (${r.hash.substring(0, 7)})</div>
+                        <div style="color: #60A5FA; margin-top: 2px;">"${r.content}"</div>
+                    </div>
+                `).join('') : '<span class="stat-label">No historical PR echoes</span>'}
+            </div>
+        </div>
+    </div>
+
+    ${analysis.onboardingTour && analysis.onboardingTour.length > 0 ? `
+        <div class="section-header">🤝 Onboarding Buddy</div>
+        <div class="bio-box" style="display: flex; justify-content: space-between; align-items: center; border-left-color: #69f0ae; background: rgba(105, 240, 174, 0.03);">
+            <div>
+                <strong>New hire?</strong> Start a guided tour of this file's evolution.
+                <div style="font-size: 0.8em; margin-top: 5px;">${analysis.onboardingTour.length} milestones found.</div>
+            </div>
+            <button onclick="startTour()">Start Tour</button>
+        </div>
+    ` : ''}
+
+    <div class="section-header">🕙 Evolution Timeline</div>
+    <div class="timeline">
+        ${commits.length > 0 ? commits.map(c => `
+            <div class="commit">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8em; color: #94A3B8; margin-bottom: 5px;">
+                    <span>${c.hash ? c.hash.substring(0, 7) : 'HEAD'}</span>
+                    <span>${new Date(c.date).toLocaleDateString()}</span>
                 </div>
-            `).join('')
-            }
+                <div style="font-weight: 700; margin-bottom: 3px;">👤 ${c.author}</div>
+                <div style="color: #CBD5E1; font-size: 0.9em;">${this.escapeHtml(c.message || 'No message')}</div>
+                ${c.hash ? `<button onclick="viewCommit('${c.hash}')">View Snapshot</button>` : ''}
+            </div>
+        `).join('') : '<div class="stat-card">No history recorded</div>'}
     </div>
 
     <script>
         const vscode = acquireVsCodeApi();
-
-        function viewCommit(hash) {
-            vscode.postMessage({
-                command: 'viewCommit',
-                hash: hash
-            });
+        function viewCommit(hash) { vscode.postMessage({ command: 'viewCommit', hash }); }
+        function promoteLore(type, content, hash) {
+            vscode.postMessage({ command: 'promoteLore', type, content, hash });
         }
-
-        // Add interactivity if needed
-        const commits = document.querySelectorAll('.commit');
-        commits.forEach(commit => {
-            commit.addEventListener('click', (e) => {
-                if (e.target.tagName === 'BUTTON') return;
-                commit.style.background = 'var(--vscode-list-activeSelectionBackground)';
-                setTimeout(() => {
-                    commit.style.background = '';
-                }, 200);
-            });
-        });
+        function startTour() {
+            vscode.postMessage({ command: 'startTour' });
+        }
     </script>
 </body>
 </html>`;
     }
 
-    /**
-     * Escape HTML to prevent XSS
-     */
+    escapeJs(text) { return text ? text.replace(/'/g, "\\'").replace(/"/g, '\\"') : ''; }
     escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return text.replace(/[&<>"']/g, m => map[m]);
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text ? text.replace(/[&<>"']/g, m => map[m]) : '';
     }
 
-    /**
-     * Dispose of the panel
-     */
-    dispose() {
-        if (this.panel) {
-            this.panel.dispose();
-        }
-    }
+    dispose() { if (this.panel) this.panel.dispose(); }
 }
 
 module.exports = TimelinePanel;

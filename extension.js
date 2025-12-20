@@ -130,7 +130,8 @@ function activate(context) {
         // V6 commands
         vscode.commands.registerCommand('vestige.showLore', showLore),
         vscode.commands.registerCommand('vestige.aiHistorian', aiHistorian),
-        vscode.commands.registerCommand('vestige.addDecision', addDecision)
+        vscode.commands.registerCommand('vestige.addDecision', addDecision),
+        vscode.commands.registerCommand('vestige.promoteLore', promoteLore)
     );
 
     // Auto-analyze on file open/change
@@ -260,6 +261,15 @@ async function analyzeCurrentFile(force = false) {
             const stability = Math.max(0, 100 - (analysis.churn.totalCommits * 2));
             analysis.stability = stability;
 
+            // Elite: Ownership Heat
+            analysis.ownershipHeat = gitAnalyzer.calculateOwnershipHeat(analysis);
+
+            // Elite: Narrative Biography
+            analysis.narrativeBiography = gitAnalyzer.generateNarrativeBiography(analysis);
+
+            // Elite: Ghost Shadows (Recent Deletions)
+            analysis.deletedChunks = await gitAnalyzer.findRecentDeletions(workspaceFolder.uri.fsPath, filePath);
+
             // Cache the result
             analysisCache.set(cacheKey, analysis);
 
@@ -273,17 +283,78 @@ async function analyzeCurrentFile(force = false) {
         // Apply decorations
         decorators.applyDecorations(editor, analysis);
 
-        // Update status bar with rich metrics
+        // Elite: Structural Intelligence
+        const symbols = await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', document.uri) || [];
+        analysis.zombieMethods = await detectZombieMethods(analysis, symbols, document);
+
+        // Update status bar
         const stabilityIcon = analysis.stability > 80 ? '$(shield)' : analysis.stability > 50 ? '$(warning)' : '$(flame)';
-        statusBarItem.text = `${stabilityIcon} ${analysis.stability}% | 👤 ${analysis.ownership.topAuthor} (${analysis.ownership.percent}%)`;
-        statusBarItem.tooltip = `Vestige Analysis:\n- Stability: ${analysis.stability}%\n- Top Author: ${analysis.ownership.topAuthor}\n- Total Commits: ${analysis.churn.totalCommits}\n\nClick to show timeline`;
+        let statusText = `${stabilityIcon} ${analysis.stability}% | 👤 ${analysis.ownership.topAuthor} (${analysis.ownership.percent}%)`;
+
+        if (analysis.interestRate > 50) statusText += ` | 💸 ${analysis.interestRate}% Interest`;
+
+        statusBarItem.text = statusText;
+        statusBarItem.tooltip = `Vestige Analysis:\n- Stability: ${analysis.stability}%\n- Top Author: ${analysis.ownership.topAuthor}\n- Interest Rate: ${analysis.interestRate}%\n- Originality: ${analysis.originalityIndex}%\n\nClick to show timeline`;
         statusBarItem.show();
+
+        // Elite: Actionable Coupling Notification
+        checkCoupledFiles(analysis, document.uri);
+
+        // Elite: Achievements
+        achievements.checkAchievements('analysis', null, analysis);
 
     } catch (error) {
         console.error('Vestige analysis error:', error);
         statusBarItem.text = "$(warning) Vestige";
         statusBarItem.tooltip = `Analysis failed: ${error.message}`;
         statusBarItem.show();
+    }
+}
+
+/**
+ * Elite: Structural Zombie Detection
+ */
+async function detectZombieMethods(analysis, symbols, document) {
+    const zombies = [];
+    const now = new Date();
+    const oneYearAgo = now.getTime() - (365 * 24 * 60 * 60 * 1000);
+
+    const traverse = (symbol) => {
+        // Look for methods/functions/classes
+        if ([vscode.SymbolKind.Method, vscode.SymbolKind.Function, vscode.SymbolKind.Class].includes(symbol.kind)) {
+            const startLine = symbol.range.start.line + 1;
+            const endLine = symbol.range.end.line + 1;
+
+            const lines = analysis.lines.filter(l => l.lineNo >= startLine && l.lineNo <= endLine);
+            if (lines.length > 0) {
+                const isAllOld = lines.every(l => l.date < oneYearAgo);
+                if (isAllOld && analysis.churn.totalCommits > 10) {
+                    zombies.push({
+                        name: symbol.name,
+                        ageDays: Math.round((now - Math.min(...lines.map(l => l.date))) / (1000 * 60 * 60 * 24)),
+                        range: symbol.range
+                    });
+                }
+            }
+        }
+        if (symbol.children) symbol.children.forEach(traverse);
+    };
+
+    symbols.forEach(traverse);
+    return zombies;
+}
+
+/**
+ * Elite: Actionable Coupling
+ */
+function checkCoupledFiles(analysis, uri) {
+    if (analysis.knowledgeNeighbors && analysis.knowledgeNeighbors.length > 0) {
+        const strongCouples = analysis.knowledgeNeighbors.filter(n => n.strength > 5);
+        if (strongCouples.length > 0) {
+            const list = strongCouples.map(c => c.name).join(', ');
+            // Debounce or only show once per session for this file
+            vscode.window.showInformationMessage(`🔗 Actionable Coupling: This file is often changed with members like ${list}. Consider checking their context.`);
+        }
     }
 }
 
@@ -326,10 +397,15 @@ async function showTimeline() {
             document.uri.fsPath
         );
 
+        // Elite: Analysis data
+        const cacheKey = `${document.uri.fsPath}-${document.version}`;
+        const analysis = analysisCache.get(cacheKey);
+
         timeline.coupling = coupling;
         timeline.epochs = epochs;
         timeline.busFactor = busFactor;
         timeline.repoPath = workspaceFolder.uri.fsPath;
+        timeline.narrative = analysis ? analysis.narrativeBiography : 'Analyzing history...';
 
         // V6: Get decisions
         const decisions = loreService.getDecisionsForFile(document.uri.fsPath);
@@ -675,7 +751,7 @@ async function showLore() {
     if (!editor) return;
 
     const decisions = loreService.getDecisionsForFile(editor.document.uri.fsPath);
-
+    achievements.checkAchievements('loreAdded', decisions.length);
     if (decisions.length === 0) {
         vscode.window.showInformationMessage('No Lore decisions found for this file.');
         return;
@@ -715,6 +791,45 @@ ${d.alternatives ? JSON.stringify(d.alternatives, null, 2) : 'None'}
             language: 'markdown'
         });
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    }
+}
+
+/**
+ * Elite: Promote automated Lore to manual decision
+ */
+async function promoteLore(type, content, hash, repoPath, fileName) {
+    const title = await vscode.window.showInputBox({
+        prompt: `Promote this ${type} to a formal Decision`,
+        value: `Decision: ${content.substring(0, 30)}...`
+    });
+
+    if (!title) return;
+
+    try {
+        const lorePath = path.join(repoPath, '.lore', 'decisions');
+        if (!require('fs').existsSync(lorePath)) {
+            require('fs').mkdirSync(lorePath, { recursive: true });
+        }
+
+        const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const fullPath = path.join(lorePath, `${safeTitle}.lean`);
+
+        const leanContent = `Decision {
+  title: "${title}"
+  status: "Decided"
+  date: "${new Date().toISOString().split('T')[0]}"
+  context: "Extracted from Git history (Commit ${hash.substring(0, 7)})"
+  decision: "${content}"
+  files: ["${fileName}"]
+}`;
+
+        require('fs').writeFileSync(fullPath, leanContent);
+        vscode.window.showInformationMessage(`✅ Lore Promoted: ${title}`);
+
+        // Refresh analysis
+        analyzeCurrentFile(true);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to promote Lore: ${error.message}`);
     }
 }
 
