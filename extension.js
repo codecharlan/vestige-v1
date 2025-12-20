@@ -7,6 +7,12 @@ const FileDecorator = require('./file-decorator');
 const VestigeDocumentProvider = require('./document-provider');
 const EvolutionPanel = require('./evolution-panel');
 const GraveyardPanel = require('./graveyard-panel');
+const GravityWellPanel = require('./gravity-well-panel');
+const GhostCursorManager = require('./ghost-cursor');
+const PulsePanel = require('./pulse-panel');
+const CipherPetManager = require('./cipher-pet');
+const EchoChamberManager = require('./echo-chamber');
+const WormholeManager = require('./wormhole');
 // V4
 const RepoAnalyzer = require('./repo-analyzer');
 const AchievementSystem = require('./achievements');
@@ -20,6 +26,7 @@ const RewindManager = require('./rewind-manager');
 const LeaderboardPanel = require('./leaderboard-panel');
 const PerformancePanel = require('./performance-panel');
 const FlowPanel = require('./flow-panel');
+const TimeMachineManager = require('./time-machine');
 // V6
 const { LoreService } = require('./lore-service');
 
@@ -46,6 +53,13 @@ let performancePanel;
 let flowPanel;
 // V6
 let loreService;
+let timeMachine;
+let gravityWellPanel;
+let ghostCursor;
+let pulsePanel;
+let cipherPet;
+let echoChamber;
+let wormhole;
 
 let analysisCache = new Map();
 let isEnabled = true;
@@ -81,9 +95,17 @@ function activate(context) {
 
     // V6 initialization
     loreService = new LoreService();
+    timeMachine = new TimeMachineManager();
+    gravityWellPanel = new GravityWellPanel(context);
+    ghostCursor = new GhostCursorManager();
+    pulsePanel = new PulsePanel(context);
+    cipherPet = new CipherPetManager(context);
+    echoChamber = new EchoChamberManager();
+    wormhole = new WormholeManager(timeMachine);
     if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
         loreService.initialize(vscode.workspace.workspaceFolders[0].uri.fsPath);
     }
+    cipherPet.initialize();
 
     // Register Document Provider
     context.subscriptions.push(
@@ -131,7 +153,18 @@ function activate(context) {
         vscode.commands.registerCommand('vestige.showLore', showLore),
         vscode.commands.registerCommand('vestige.aiHistorian', aiHistorian),
         vscode.commands.registerCommand('vestige.addDecision', addDecision),
-        vscode.commands.registerCommand('vestige.promoteLore', promoteLore)
+        vscode.commands.registerCommand('vestige.promoteLore', promoteLore),
+        vscode.commands.registerCommand('vestige.chatWithGhost', chatWithGhost),
+        vscode.commands.registerCommand('vestige.runTimeMachine', runTimeMachine),
+        vscode.commands.registerCommand('vestige.showGravityWell', showGravityWell),
+        vscode.commands.registerCommand('vestige.replayGhost', replayGhost),
+        vscode.commands.registerCommand('vestige.showPulse', showPulse),
+        vscode.commands.registerCommand('vestige.showPetDetails', () => cipherPet.showDetails()),
+        vscode.commands.registerCommand('vestige.toggleEcho', () => echoChamber.toggle()),
+        vscode.commands.registerCommand('vestige.openWormhole', (hash) => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor) wormhole.openPortal(editor, hash, editor.document.uri.fsPath);
+        })
     );
 
     // Auto-analyze on file open/change
@@ -260,6 +293,9 @@ async function analyzeCurrentFile(force = false) {
             // Stability Score: 100 - (commits * 2), min 0
             const stability = Math.max(0, 100 - (analysis.churn.totalCommits * 2));
             analysis.stability = stability;
+
+            // Phase Zenith: Auditory Reflection
+            echoChamber.reflect(analysis);
 
             // Elite: Ownership Heat
             analysis.ownershipHeat = gitAnalyzer.calculateOwnershipHeat(analysis);
@@ -952,6 +988,134 @@ function deactivate() {
     if (leaderboardPanel) leaderboardPanel.dispose(); // V5
     if (performancePanel) performancePanel.dispose(); // V5
     if (flowPanel) flowPanel.dispose(); // V5
+}
+
+/**
+ * God-Tier: Pair program with a "Ghost" of a historical author.
+ */
+async function chatWithGhost(author, hash, repoPath, fileName) {
+    try {
+        vscode.window.showInformationMessage(`Contacting the digital twin of ${author}... 👻`);
+
+        // 1. Get history for this author (subset)
+        const timeline = await gitAnalyzer.getFileTimeline(repoPath, fileName);
+        const authorCommits = (timeline.commits || []).filter(c => c.author === author);
+
+        // 2. Generate persona
+        const persona = await aiService.generateHistoricalPersona(author, authorCommits);
+
+        // 3. Open chat session
+        const userMsg = await vscode.window.showInputBox({
+            prompt: `Ghost of ${author}: "${persona}"`,
+            placeHolder: "Ask the ghost about their original architectural intent..."
+        });
+
+        if (userMsg) {
+            vscode.window.showInformationMessage(`Invoking the echo of ${author}...`);
+            const chatContext = `File: ${path.basename(fileName)}, Commit Hash: ${hash}`;
+            const response = await aiService.chatWithGhost(author, persona, userMsg, chatContext);
+
+            // Show response in a markdown document for better readability
+            const doc = await vscode.workspace.openTextDocument({
+                content: `# 👻 Ghost of ${author}\n\n**Persona**: ${persona}\n\n---\n\n**Response**:\n${response}`,
+                language: 'markdown'
+            });
+            await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+        }
+    } catch (e) {
+        vscode.window.showErrorMessage(`Temporal pairing failed: ${e.message}`);
+    }
+}
+
+/**
+ * God-Tier: Run a file's historical state in the Time Machine REPL.
+ */
+async function runTimeMachine(commitHash, filePath, repoPath) {
+    try {
+        vscode.window.showInformationMessage(`Initiating Time Machine virtual execution... 🌀 [${commitHash.substring(0, 7)}]`);
+
+        const output = await timeMachine.runVirtual(repoPath, filePath, commitHash);
+
+        const doc = await vscode.workspace.openTextDocument({
+            content: `# 🌀 Time Machine REPL Output\n\n**Commit**: ${commitHash}\n**File**: ${path.basename(filePath)}\n\n---\n\n**Console Output**:\n\`\`\`\n${output}\n\`\`\``,
+            language: 'markdown'
+        });
+        await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    } catch (e) {
+        vscode.window.showErrorMessage(`Time Machine failure: ${e.message}`);
+    }
+}
+
+/**
+ * God-Tier: Show 3D Architectural Gravity Well.
+ */
+async function showGravityWell() {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    try {
+        const cacheKey = `${editor.document.uri.fsPath}-${editor.document.version}`;
+        const analysis = analysisCache.get(cacheKey);
+
+        if (!analysis) {
+            vscode.window.showWarningMessage('Please wait for file analysis to complete.');
+            return;
+        }
+
+        gravityWellPanel.show(analysis);
+    } catch (e) {
+        vscode.window.showErrorMessage(`Gravity Well failure: ${e.message}`);
+    }
+}
+
+/**
+ * God-Tier: Replay the creation of code via Ghost Cursor.
+ */
+async function replayGhost(hash) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    try {
+        const repoPath = vscode.workspace.getWorkspaceFolder(editor.document.uri)?.uri.fsPath;
+        if (!repoPath) return;
+
+        vscode.window.showInformationMessage(`Synthesizing keystrokes for commit ${hash.substring(0, 7)}...`);
+
+        // Use git-analyzer to get the diff (simplified)
+        const diff = await gitAnalyzer.getCommitDiff(repoPath, hash);
+        await ghostCursor.replay(editor, diff);
+    } catch (e) {
+        vscode.window.showErrorMessage(`Ghost Cursor failure: ${e.message}`);
+    }
+}
+
+/**
+ * God-Tier: Show Project-Wide Isometric Activity Pulse.
+ */
+async function showPulse() {
+    try {
+        const repoPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!repoPath) return;
+
+        vscode.window.showInformationMessage('Synthesizing project-wide architectural pulse... 🏙️');
+
+        // Use repo-analyzer to get project stats
+        const stats = await repoAnalyzer.analyzeAllFiles(repoPath);
+
+        // Transform stats for the pulse panel
+        const repoData = {
+            files: (stats.files || []).map(f => ({
+                path: f.path,
+                size: f.lines,
+                age: f.maxAge,
+                activity: f.churn / 100 // Normalized
+            }))
+        };
+
+        pulsePanel.show(repoData);
+    } catch (e) {
+        vscode.window.showErrorMessage(`Pulse failure: ${e.message}`);
+    }
 }
 
 module.exports = {

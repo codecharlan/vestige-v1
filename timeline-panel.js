@@ -52,6 +52,21 @@ class TimelinePanel {
                     case 'promoteLore':
                         vscode.commands.executeCommand('vestige.promoteLore', message.type, message.content, message.hash, analysis.repoPath, fileName);
                         break;
+                    case 'chatWithGhost':
+                        vscode.commands.executeCommand('vestige.chatWithGhost', message.author, message.hash, analysis.repoPath, fileName);
+                        break;
+                    case 'runTimeMachine':
+                        vscode.commands.executeCommand('vestige.runTimeMachine', message.hash, fileName, analysis.repoPath);
+                        break;
+                    case 'showGravityWell':
+                        vscode.commands.executeCommand('vestige.showGravityWell');
+                        break;
+                    case 'replayGhost':
+                        vscode.commands.executeCommand('vestige.replayGhost', message.hash);
+                        break;
+                    case 'openWormhole':
+                        vscode.commands.executeCommand('vestige.openWormhole', message.hash);
+                        break;
                 }
             });
 
@@ -177,6 +192,15 @@ class TimelinePanel {
         </div>
     </div>
 
+    <div style="display: flex; gap: 8px; margin-bottom: 30px;">
+        <button onclick="showGravityWell()" style="flex: 1; border-color: #F472B6; color: #F472B6; background: rgba(244, 114, 182, 0.05);">
+            🌌 View 3D Gravity Well
+        </button>
+        <button onclick="showPulse()" style="flex: 1; border-color: #60A5FA; color: #60A5FA; background: rgba(96, 165, 250, 0.05);">
+            🏙️ View Activity Pulse
+        </button>
+    </div>
+
     ${analysis.badges && analysis.badges.length > 0 ? `
         <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
             ${analysis.badges.map(b => `<span class="badge" style="background: ${b.color}33; color: ${b.color}; border: 1px solid ${b.color}66; padding: 4px 10px; font-size: 0.8em;">${b.label}</span>`).join('')}
@@ -215,6 +239,25 @@ class TimelinePanel {
         </div>
     </div>
 
+    ${analysis.butterflyRipples && analysis.butterflyRipples.length > 0 ? `
+        <div class="section-header">🦋 Butterfly Effect Predictor</div>
+        <div class="stat-card" style="text-align: left; margin-bottom: 30px; border-left: 4px solid #F472B6; background: rgba(244, 114, 182, 0.05);">
+            <div style="font-size: 0.85em; color: #F472B6; margin-bottom: 10px; font-weight: 600;">Predicted Downstream Impacts (Secondary Ripples)</div>
+            ${analysis.butterflyRipples.map(r => `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-weight: 500; color: #F8FAFC; font-size: 0.9em;">${r.file}</div>
+                        <div style="font-size: 0.75em; color: #94A3B8;">${r.reason}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="badge" style="background: rgba(244, 114, 182, 0.2); color: #F472B6; font-size: 0.7em;">Depth ${r.depth}</span>
+                        <div style="font-size: 0.7em; color: #F472B6; margin-top: 2px;">${r.strength}% Impact</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    ` : ''}
+
     ${analysis.onboardingTour && analysis.onboardingTour.length > 0 ? `
         <div class="section-header">🤝 Onboarding Buddy</div>
         <div class="bio-box" style="display: flex; justify-content: space-between; align-items: center; border-left-color: #69f0ae; background: rgba(105, 240, 174, 0.03);">
@@ -234,9 +277,17 @@ class TimelinePanel {
                     <span>${c.hash ? c.hash.substring(0, 7) : 'HEAD'}</span>
                     <span>${new Date(c.date).toLocaleDateString()}</span>
                 </div>
-                <div style="font-weight: 700; margin-bottom: 3px;">👤 ${c.author}</div>
+                <div style="font-weight: 700; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>👤 ${c.author}</span>
+                    <button onclick="chatWithGhost('${this.escapeJs(c.author)}', '${c.hash}')" style="margin: 0; padding: 2px 8px; font-size: 0.7em;">👻 Pair with Ghost</button>
+                </div>
                 <div style="color: #CBD5E1; font-size: 0.9em;">${this.escapeHtml(c.message || 'No message')}</div>
-                ${c.hash ? `<button onclick="viewCommit('${c.hash}')">View Snapshot</button>` : ''}
+                <div style="display: flex; gap: 8px;">
+                    ${c.hash ? `<button onclick="viewCommit('${c.hash}')">View Snapshot</button>` : ''}
+                    ${c.hash ? `<button onclick="runTimeMachine('${c.hash}')" style="border-color: #60A5FA; color: #60A5FA;">🌀 Run in Time Machine</button>` : ''}
+                    ${c.hash ? `<button onclick="replayGhost('${c.hash}')" style="border-color: #FBBF24; color: #FBBF24;">👻 Replay with Ghost Cursor</button>` : ''}
+                    ${c.hash ? `<button onclick="openWormhole('${c.hash}')" style="border-color: #A78BFA; color: #A78BFA;">🕳️ Open Temporal Wormhole</button>` : ''}
+                </div>
             </div>
         `).join('') : '<div class="stat-card">No history recorded</div>'}
     </div>
@@ -249,6 +300,24 @@ class TimelinePanel {
         }
         function startTour() {
             vscode.postMessage({ command: 'startTour' });
+        }
+        function chatWithGhost(author, hash) {
+            vscode.postMessage({ command: 'chatWithGhost', author, hash });
+        }
+        function runTimeMachine(hash) {
+            vscode.postMessage({ command: 'runTimeMachine', hash });
+        }
+        function showGravityWell() {
+            vscode.postMessage({ command: 'showGravityWell' });
+        }
+        function replayGhost(hash) {
+            vscode.postMessage({ command: 'replayGhost', hash });
+        }
+        function showPulse() {
+            vscode.postMessage({ command: 'showPulse' });
+        }
+        function openWormhole(hash) {
+            vscode.postMessage({ command: 'openWormhole', hash });
         }
     </script>
 </body>
