@@ -1,0 +1,87 @@
+<idea-plugin>
+    <id>com.codecharlan.vestige</id>
+    <name>Vestige - Temporal Code Intelligence</name>
+    <vendor email="support@codecharlan.com" url="https://github.com/codecharlan/vestige-v1">codecharlan</vendor>
+
+    <description><![CDATA[
+    Uncover the traces of your codebase through time.
+    Inline temporal annotations, heatmaps, and AI-powered insights.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Vestige" secondary="true" icon="AllIcons.Actions.ListFiles" anchor="right"
+                    factoryClass="com.codecharlan.vestige.ui.VestigeToolWindowFactory"/>
+        
+        <statusBarWidgetFactory implementation="com.codecharlan.vestige.ui.VestigeStatusBarWidgetFactory"
+                                 id="VestigeStatusBar"/>
+        
+        <editorLineMarkerProvider language="ANY"
+                                 implementationClass="com.codecharlan.vestige.ui.VestigeLineMarkerProvider"/>
+        
+        <applicationService serviceImplementation="com.codecharlan.vestige.logic.VestigeAIService"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeGitAnalyzer"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeAchievementService"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeService"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeRewindService"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeLoreService"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeCipherPet"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeEchoChamber"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeGhostCursor"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeWormholeService"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeButterflyEffectAnalyzer"/>
+        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeLoreBridge"/>
+
+        <projectConfigurable parentId="tools" instance="com.codecharlan.vestige.ui.VestigeSettingsConfigurable"
+                            id="com.codecharlan.vestige.settings" displayName="Vestige"/>
+        
+        <projectViewNodeDecorator implementation="com.codecharlan.vestige.ui.VestigeFileDecorator"/>
+
+        <projectListeners>
+            <listener class="com.codecharlan.vestige.logic.VestigeFileListener"
+                      topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+            <listener class="com.codecharlan.vestige.logic.VestigeEditorListener"
+                      topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+        </projectListeners>
+    </extensions>
+
+    <actions>
+        <group id="VestigeActionGroup" text="Vestige" popup="true" icon="AllIcons.Actions.ListFiles">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <action id="Vestige.AnalyzeFile" class="com.codecharlan.vestige.ui.AnalyzeFileAction"
+                    text="Analyze Current File" description="Force re-analysis of the current file history"/>
+            <action id="Vestige.CommandPalette" class="com.codecharlan.vestige.ui.CommandPaletteAction"
+                    text="Command Palette" description="Fuzzy search for all Vestige features">
+                <keyboard-shortcut keymap="$default" first-keystroke="control alt V"/>
+            </action>
+            <action id="Vestige.ShowTimeline" class="com.codecharlan.vestige.ui.ShowTimelineAction"
+                    text="Show File Timeline" description="Open the temporal timeline for the current file"/>
+            <action id="Vestige.HistoryQuery" class="com.codecharlan.vestige.ui.HistoryQueryAction"
+                    text="Search Project Lore" description="Query historical decisions using natural language"/>
+            <action id="Vestige.AddDecision" class="com.codecharlan.vestige.ui.AddDecisionAction"
+                    text="Add Lore Decision ➕" description="Record a new architectural decision"/>
+            <action id="Vestige.ShowEvolution" class="com.codecharlan.vestige.ui.ShowEvolutionAction"
+                    text="Show Code Evolution" description="Visualize how the project has changed over time"/>
+            <action id="Vestige.Rewind" class="com.codecharlan.vestige.ui.RewindAction"
+                    text="Rewind Time ⏪" description="Checkout a previous commit to explore history"/>
+            <separator/>
+            <action id="Vestige.ChatWithGhost" class="com.codecharlan.vestige.ui.ChatWithGhostAction"
+                    text="Chat with Ghost 👻" description="Consult the AI about code history"/>
+            <action id="Vestige.Wormhole" class="com.codecharlan.vestige.ui.WormholeAction"
+                    text="Open Wormhole 🕳️" description="Bridge historical code into the present"/>
+            <action id="Vestige.ToggleEcho" class="com.codecharlan.vestige.ui.ToggleEchoAction"
+                    text="Toggle Echo Chamber 🔊" description="Auditory code health feedback"/>
+            <action id="Vestige.ShowPet" class="com.codecharlan.vestige.ui.ShowPetDetailsAction"
+                    text="Inspect Cipher Pet ✨" description="Interact with your code archaeologist companion"/>
+            <action id="Vestige.ShareLore" class="com.codecharlan.vestige.ui.ShareLoreAction"
+                    text="Share Lore to Team 🚀" description="Export insights to Slack/Discord"/>
+            <separator/>
+            <action id="Vestige.ClearCache" class="com.codecharlan.vestige.ui.ClearCacheAction"
+                    text="Clear Vestige Cache" description="Purge cached analysis data"/>
+            <action id="Vestige.Toggle" class="com.codecharlan.vestige.ui.ToggleAnnotationsAction"
+                    text="Toggle Annotations" description="Enable/Disable temporal annotations"/>
+        </group>
+    </actions>
+</idea-plugin>
