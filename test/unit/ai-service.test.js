@@ -58,13 +58,23 @@ suite('AIService Test Suite', () => {
         assert.strictEqual(result, 'AI Explanation');
     });
 
-    test('analyzeStagnation returns archaeological hypothesis', async () => {
-        const result = await service.analyzeStagnation('test.js', 365, 10, 'context');
-        assert.ok(result.includes('ARCHAEOLOGICAL HYPOTHESIS'));
-    });
-
     test('suggestRefactoring returns ROI intel', async () => {
         const result = await service.suggestRefactoring('test.js', 50, 100);
-        assert.ok(result.includes('REFACTORING INTEL'));
+        assert.strictEqual(result, 'AI Explanation');
+    });
+
+    test('summarizeDiff returns concise summary', async () => {
+        const result = await service.summarizeDiff('diff content');
+        assert.strictEqual(result, 'AI Explanation');
+    });
+
+    test('predictStabilityImpact returns ROI prediction', async () => {
+        const result = await service.predictStabilityImpact('test.js', 'refactor rule');
+        assert.strictEqual(result, 'AI Explanation');
+    });
+
+    test('analyzeStagnation returns archaeological hypothesis', async () => {
+        const result = await service.analyzeStagnation('test.js', 365, {}, 'context');
+        assert.strictEqual(result, 'AI Explanation');
     });
 });

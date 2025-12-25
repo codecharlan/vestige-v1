@@ -1,5 +1,5 @@
 :root {
-    /* Modern Colors */
+    /* Centurion Zenith Elite Tokens */
     --vestige-green: #10B981;
     --vestige-amber: #F59E0B;
     --vestige-red: #EF4444;
@@ -7,107 +7,142 @@
     --vestige-blue: #3B82F6;
     --vestige-pink: #F472B6;
 
-    /* Backgrounds & Surfaces */
-    --vestige-bg: var(--vscode-editor-background);
-    --vestige-surface: rgba(255, 255, 255, 0.03);
-    --vestige-border: rgba(255, 255, 255, 0.1);
+    /* Holographic Mesh Palette */
+    --vestige-hologram-1: #1E293B;
+    --vestige-hologram-2: #334155;
+    --vestige-glow: rgba(59, 130, 246, 0.5);
 
-    /* Glassmorphism */
-    --vestige-glass: rgba(255, 255, 255, 0.05);
-    --vestige-glass-blur: blur(12px);
+    /* Surface & Glass */
+    --vestige-bg: #0F172A;
+    --vestige-glass: rgba(15, 23, 42, 0.7);
+    --vestige-glass-blur: blur(24px);
+    --vestige-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 
-    /* Neumorphism (Soft Shadows) */
-    --vestige-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    /* Elite Shadows & Borders */
+    --vestige-luminous-border: inset 0 0 10px rgba(255, 255, 255, 0.05), 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Base Styles */
+/* Base Overhaul */
 body {
-    font-family: 'Inter', -apple-system, sans-serif;
-    line-height: 1.6;
-    padding: 30px;
-    margin: 0;
+    font-family: 'Inter Variable', 'Inter', sans-serif;
     background-color: var(--vestige-bg);
-    color: var(--vscode-foreground);
+    color: #F8FAFC;
+    margin: 0;
+    padding: 24px;
+    overflow-x: hidden;
+    position: relative;
 }
 
-/* Glass Card */
-.glass-card {
+/* Organic Noise Overlay */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.03;
+    pointer-events: none;
+    background-image: var(--vestige-noise);
+    z-index: 9999;
+}
+
+/* Zenith Elite Card: Holographic + Reactive */
+.zenith-card {
     background: var(--vestige-glass);
     backdrop-filter: var(--vestige-glass-blur);
-    -webkit-backdrop-filter: var(--vestige-glass-blur);
-    border: 1px solid var(--vestige-border);
-    border-radius: 12px;
-    box-shadow: var(--vestige-shadow);
-    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--vestige-luminous-border);
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Animations */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.zenith-card::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+    transition: opacity 0.5s;
+    opacity: 0;
 }
 
-.animate-fade {
-    animation: fadeIn 0.4s ease-out;
+.zenith-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(59, 130, 246, 0.2);
 }
 
-/* Typography Enhancements */
+.zenith-card:hover::after {
+    opacity: 1;
+}
+
+/* Kinetic Typography */
 h1,
 h2,
 h3 {
-    letter-spacing: -0.02em;
-    font-family: 'Inter', -apple-system, sans-serif;
-}
-
-h1 {
-    font-size: 2.2em;
-    font-weight: 800;
-    margin-bottom: 24px;
-}
-
-h2 {
-    font-size: 1.5em;
-    font-weight: 700;
-    margin-top: 32px;
-}
-
-.mono {
-    font-family: 'JetBrains Mono', monospace;
-}
-
-/* Premium Animated Gradients */
-.gradient-text {
-    background: linear-gradient(90deg, var(--vestige-blue), var(--vestige-purple), var(--vestige-pink));
-    background-clip: text;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    background: linear-gradient(135deg, #FFF 0%, #94A3B8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-size: 200% auto;
-    animation: shine 4s linear infinite;
+    transition: font-weight 0.3s ease;
 }
 
-@keyframes shine {
-    to {
-        background-position: 200% center;
+.zenith-card:hover h2 {
+    font-weight: 400;
+    /* Kinetic Weight Shift */
+}
+
+/* Liquid Status Bars */
+.liquid-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    position: relative;
+}
+
+.liquid-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--vestige-blue), var(--vestige-purple));
+    box-shadow: 0 0 15px var(--vestige-blue);
+    animation: liquidFlow 3s infinite ease-in-out;
+}
+
+@keyframes liquidFlow {
+
+    0%,
+    100% {
+        transform: scaleX(1);
+        opacity: 0.8;
+    }
+
+    50% {
+        transform: scaleX(1.05);
+        opacity: 1;
     }
 }
 
-/* Tooltip Simulation via Micro-interactions */
-.stat-card:hover {
-    transform: translateY(-4px) scale(1.02);
-    border-color: var(--vestige-blue);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Accessibility & Utility */
-.badge {
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 800;
+/* Animated Mesh Gradient Background */
+.mesh-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background:
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(244, 114, 182, 0.1) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+    filter: blur(80px);
 }

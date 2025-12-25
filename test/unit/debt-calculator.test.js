@@ -38,14 +38,16 @@ suite('DebtCalculator Test Suite', () => {
     });
 
     test('forecastDebtHorizon calculates future debt', () => {
-        const mockAnalysis = {
-            lines: { length: 200 },
-            churn: { totalCommits: 50 },
-            interestRate: 20
+        const mockDebt = {
+            churn: 50,
+            age: 365,
+            complexity: 200,
+            score: 20,
+            cost: 1000
         };
-        const forecast = calculator.forecastDebtHorizon(mockAnalysis, 180);
-        assert.ok(forecast.score > mockAnalysis.interestRate);
-        assert.ok(forecast.cost > 0);
+        const forecast = calculator.forecastDebtHorizon(mockDebt, 180);
+        assert.ok(forecast.score > mockDebt.score);
+        assert.ok(forecast.cost > mockDebt.cost);
         assert.ok(forecast.increasePercent > 0);
     });
 });

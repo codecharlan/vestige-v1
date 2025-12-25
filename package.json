@@ -2,7 +2,7 @@
     "name": "vestige",
     "displayName": "Vestige - Temporal Code Intelligence",
     "description": "Uncover the traces of your codebase through time. Inline temporal linting that reveals code age, churn, and evolution.",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "publisher": "codecharlan",
     "repository": {
         "type": "git",
@@ -109,6 +109,10 @@
             {
                 "command": "vestige.aiHistorian",
                 "title": "Vestige: AI Code Historian 💬"
+            },
+            {
+                "command": "vestige.commandPalette",
+                "title": "Vestige: Command Palette ⌨️"
             },
             {
                 "command": "vestige.addDecision",

@@ -183,6 +183,22 @@ Suggest 3 specific, high-impact refactorings to reduce technical debt and improv
 
         return await this.explainText(prompt);
     }
+
+    /**
+     * Centurion: Summarize a complex diff in a single sentence.
+     */
+    async summarizeDiff(diff) {
+        const prompt = `Summarize this technical diff in 1 sentence for a project lead:\n\n${diff.take ? diff.take(2000) : diff.substring(0, 2000)}`;
+        return await this.explainText(prompt);
+    }
+
+    /**
+     * Centurion: Predict refactoring ROI.
+     */
+    async predictStabilityImpact(filePath, change) {
+        const prompt = `Predict the stability impact (ROI) of this refactoring in ${filePath}: ${change}`;
+        return await this.explainText(prompt);
+    }
 }
 
 module.exports = AIService;

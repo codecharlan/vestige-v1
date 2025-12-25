@@ -3,123 +3,115 @@
 </p>
 
 # 🗿 Vestige - Temporal Code Intelligence
-
-> *Uncover the traces of your codebase through time*
+> *Uncover the traces of your codebase through time. Certified Master Release.*
 
 Vestige brings **temporal awareness** directly into your code editor. See which code is ancient, which is churning, and which just changed—all without leaving your file.
 
-## ✨ Features
+Vestige 2.0 (**Centurion Vision**) introduces a world-class temporal intelligence engine and **Zenith Elite** aesthetics. Experience a premium, innovative engineering platform that reveals code age, churn, and evolution through the lens of AI.
+
+---
+
+## 🏛️ Core Features (The Foundation)
+*Essential temporal utility for every developer.*
 
 ### 🗺️ Heatmap Explorer
-Files in the VS Code Explorer are automatically color-coded based on their git history:
-- 🔥 **High Churn** - Files that change frequently (red indicator)
-- 🗿 **Fossils** - Ancient, untouched code (grey indicator)
-- ✨ **Recent** - Fresh changes (green indicator)
+Files in the Explorer are automatically color-coded based on their git history:
+- 🔥 **High Churn** - Files that change frequently (Red indicator)
+- 🗿 **Fossils** - Ancient, untouched code (Grey indicator)
+- ✨ **Recent** - Fresh changes (Green indicator)
 
-### Inline Temporal Annotations
-Vestige analyzes your git history and adds intuitive indicators right in your editor:
-- 🔥 **High Churn** - Code that's been modified frequently (default: 10+ changes)
-- 🗿 **Fossils** - Ancient, untouched code (default: 1+ year old)
-- ✨ **Recent** - Fresh changes (less than 7 days old)
+### ✍️ Inline Temporal Annotations
+Tactile editor decorations that reveal history as you code:
+- **Visual Cues**: Instantly see if a block of code is a "fossil" or "active churn".
+- **Dynamic Updates**: Decorations update automatically as you commit and edit.
 
-### Rich Status Bar
-Live metrics displayed in your status bar:
-- **Stability Score** (0-100%): How stable is this file?
-- **Top Contributor**: Who "owns" this file?
-- Example: `🛡️ 85% | 👤 Sarah (60%)`
+### 🕰️ Time Travel (Timeline Panel)
+View the complete commit history of your file in a beautiful, lazy-loaded timeline:
+- Chronological commit list with full author metadata.
+- **👁️ View File at Commit**: Click to see exactly what the file looked like at any point in history.
+- **Trend Analysis**: Statistical view of commit frequency over years/months.
 
-### Rich Hover Information
-Hover over any line to see:
-- When it was last changed
-- Who modified it
-- Commit hash and date
-- File-level statistics (total commits, contributors, churn rate)
+### 🔍 Smart Refactoring & Coupling
+Discover hidden architectural patterns:
+- **Coupled Files**: Identify files that frequently change together with your current file.
+- **Dependency Insights**: Uncover hidden connections between distant modules (e.g., "🔗 Coupled with: `utils.js` (80% correlation)").
 
-### 🕰️ Time Travel
-View the complete commit history of your file in a beautiful timeline:
-- Chronological commit list
-- Author information
-- Commit messages
-- **👁️ View File at Commit** - Click to see exactly what the file looked like at that point in time
-- File evolution statistics
+### 🛡️ Rich Status Bar & Hover
+- **Status Bar Metrics**: Live Stability Score (0-100%) and Top Contributor ownership.
+- **Deep Hover**: Hover over any line to see last change date, author, commit hash, and file-level churn statistics.
 
-### 🔍 Smart Refactoring Hints
-Discover architectural insights:
-- **Coupled Files** - Files that frequently change together with your current file
-- Helps identify hidden dependencies and potential refactoring opportunities
-- Example: "🔗 Coupled with: `utils.js` (80% correlation)"
+---
 
-## 🚀 Installation
+## 🌌 Zenith Elite Aesthetics (New!)
+*The Holographic Frontier of Engineering Tools.*
 
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
-3. Search for "Vestige"
-4. Click Install
+- **Organic Depth**: Micro-noise textures and radial mesh gradients for a tactile feel.
+- **Kinetic Typography**: Variable font weight shifts that react to editor hover.
+- **Glassmorphism 2.0**: Premium backdrop blur with luminous, reactive borders.
+- **Liquid Status Bars**: Fluid-dynamic animations for stability and health indicators.
+- **Bioluminescent UI**: Pulsing organic light indicators for technical debt.
 
-## 📖 Usage
+---
 
-### Automatic Analysis
-Vestige automatically analyzes files when you open them (if they're tracked by git).
+## 🧠 Centurion Intelligence (AI) (New!)
+*Powered by Historical Intent.*
 
-### Manual Commands
-- **Vestige: Analyze Current File** - Force re-analysis
-- **Vestige: Show File Timeline** - Open timeline view in sidebar
-- **Vestige: Toggle Annotations** - Turn decorations on/off
-- **Vestige: Clear Cache** - Clear analysis cache
+- **AI Code Archaeologist**: Hypothesizes why legacy code persists (Load-Bearing Wall, Sunken Treasure, or Zombie).
+- **Historical Persona**: Understand the "soul" of the original author through AI-synthesized intent.
+- **Ghost Chat**: Pair program with the "Ghost" of a developer using their historical intent.
+- **Predictive ROI**: AI-driven stability impact analysis for proposed refactorings.
+- **Automatic Summaries**: Single-sentence technical summaries for complex historical diffs.
+
+---
+
+## 📊 Immersive Visualizations
+- **Gravity Well (3D)**: A physics-based simulation of file complexity and "gravitational" debt.
+- **Sankey Flow**: Visualize the movement of code between modules over time.
+- **Blast Radius Analyzer**: Calculate the "impact tremor" of a file's complexity.
+- **Sunburst Ownership**: Hierarchical treemap revealing the "Kings" of the codebase.
+- **Archaeology Skill Trees**: Progress through discovery to unlock advanced features.
+
+---
+
+## 🛡️ Enterprise Strategy
+- **Handoff Assistant**: Identifies modules at risk of knowledge loss.
+- **Mentorship Matcher**: Recommends historical experts for any file.
+- **Debt Horizon Forecasting**: Predicts technical debt growth over 180 days.
+- **CI/CD Gatekeeper**: Prevent high-risk temporal drift in main branches.
+- **Enterprise Bridges**: JIRA ticket creation and Slack/Discord Lore sharing.
+- **Documentation Drift**: Alerts you when docs fall out of sync with evolution.
+
+---
+
+## 🚀 Installation & Setup
+
+### VS Code
+1. Search "Vestige" in the Marketplace.
+2. Click **Install**.
+3. (Optional) Set `vestige.openaiApiKey` for AI features.
+
+### IntelliJ
+1. Open **Settings** > **Plugins**.
+2. Install **Vestige** from Disk or Marketplace.
+3. Access the **Vestige Sidebar** for full temporal dashboards.
+
+---
 
 ## ⚙️ Configuration
-
-Customize Vestige in your VS Code settings:
-
 ```json
 {
   "vestige.enabled": true,
   "vestige.churnThreshold": 10,
   "vestige.fossilThreshold": 365,
-  "vestige.showInlineAnnotations": true
+  "vestige.openaiApiKey": "sk-...",
+  "vestige.collabWebhookUrl": "https://hooks.slack.com/..."
 }
 ```
 
-## 🎯 Use Cases
-
-### Code Review
-Quickly identify risky areas:
-- High churn zones that might have bugs
-- Ancient code that might need refactoring
-- Recent changes that need attention
-- Files with shared ownership (many contributors)
-
-### Onboarding
-Understand codebase history:
-- See which code is stable vs. evolving
-- Identify key contributors and "owners"
-- Understand refactoring patterns
-- Discover coupling between components
-
-### Architecture Analysis
-Observe patterns over time:
-- Track module stability
-- Identify tightly coupled files
-- Find "hidden dependencies"
-- Measure code evolution
-
-## 🔧 Requirements
-
-- VS Code 1.80.0 or higher
-- Git repository (Vestige only works with git-tracked files)
-
-## 🐛 Known Limitations
-
-- Only works with git repositories
-- Performance may vary on very large files (10,000+ lines)
-- Cache is memory-only (cleared on restart)
-
 ## 📝 License
-
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE.md](./LICENSE.md)
 
 ---
 
 **Built with ❤️ for developers who care about code history**
-
 🗿 *Vestige - Because every line has a story*

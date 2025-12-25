@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const path = require('path');
 const GitAnalyzer = require('./git-analyzer');
 const Decorators = require('./decorators');
 const TimelinePanel = require('./timeline-panel');
@@ -29,6 +30,9 @@ const FlowPanel = require('./flow-panel');
 const TimeMachineManager = require('./time-machine');
 // V6
 const { LoreService } = require('./lore-service');
+const { HandoffAssistant, MentorshipMatcher } = require('./intelligence-services');
+const IntegrationServices = require('./integration-services');
+const SkillTreePanel = require('./skill-tree-panel');
 
 let gitAnalyzer;
 let decorators;
@@ -60,6 +64,10 @@ let pulsePanel;
 let cipherPet;
 let echoChamber;
 let wormhole;
+let handoffAssistant;
+let mentorshipMatcher;
+let integrationServices;
+let skillTreePanel;
 
 let analysisCache = new Map();
 let isEnabled = true;
@@ -98,6 +106,10 @@ function activate(context) {
     timeMachine = new TimeMachineManager();
     gravityWellPanel = new GravityWellPanel(context);
     ghostCursor = new GhostCursorManager();
+    handoffAssistant = new HandoffAssistant(gitAnalyzer);
+    mentorshipMatcher = new MentorshipMatcher(gitAnalyzer);
+    integrationServices = new IntegrationServices(context);
+    skillTreePanel = new SkillTreePanel(context);
     pulsePanel = new PulsePanel(context);
     cipherPet = new CipherPetManager(context);
     echoChamber = new EchoChamberManager();
@@ -170,7 +182,9 @@ function activate(context) {
         vscode.commands.registerCommand('vestige.openWormhole', (hash) => {
             const editor = vscode.window.activeTextEditor;
             if (editor) wormhole.openPortal(editor, hash, editor.document.uri.fsPath);
-        })
+        }),
+        vscode.commands.registerCommand('vestige.commandPalette', showCommandPalette),
+        vscode.commands.registerCommand('vestige.showSkillTree', () => skillTreePanel.show())
     );
 
     // Auto-analyze on file open/change
@@ -250,7 +264,6 @@ function activate(context) {
             if (action === 'Configure') vscode.commands.executeCommand('workbench.action.openSettings', 'vestige.collabWebhookUrl');
             return;
         }
-
         vscode.window.showInformationMessage(`Exporting ${type} lore to team channel... 🚀`);
         // Actual implementation would be a fetch() to the webhook
         setTimeout(() => vscode.window.showInformationMessage('✅ Lore shared successfully!'), 1000);
@@ -335,7 +348,9 @@ async function analyzeCurrentFile(force = false) {
 
             analysis = await gitAnalyzer.analyzeFile(
                 workspaceFolder.uri.fsPath,
-                filePath
+                filePath,
+                force,
+                context
             );
 
             // Calculate extra metrics
@@ -1200,6 +1215,47 @@ async function showPulse() {
     } catch (e) {
         vscode.window.showErrorMessage(`Pulse failure: ${e.message}`);
     }
+}
+
+/**
+ * Centurion: Fuzzy Search Command Palette
+ */
+async function showCommandPalette() {
+    const commands = [
+        { label: 'Analyze Current File', command: 'vestige.analyze', detail: 'Force re-analysis of the current file history' },
+        { label: 'Show File Timeline', command: 'vestige.showTimeline', detail: 'Open the temporal timeline for the current file' },
+        { label: 'Search Project Lore', command: 'vestige.historyQuery', detail: 'Query technical debt and historical context' },
+        { label: 'Add Lore Decision', command: 'vestige.addDecision', detail: 'Record a new architectural decision' },
+        { label: 'Rewind Time ⏪', command: 'vestige.rewind', detail: 'Workspace-wide time travel' },
+        { label: 'Chat with Ghost 👻', command: 'vestige.chatWithGhost', detail: 'Simulate past developers for Q&A' },
+        { label: 'Open Wormhole 🕳️', command: 'vestige.openWormhole', detail: 'Inject historical code fragments' },
+        { label: 'Toggle Echo Chamber', command: 'vestige.toggleEcho', detail: 'Auditory code health feedback' },
+        { label: 'Share Lore to Team', command: 'vestige.shareLore', detail: 'Export insights to Slack/Discord' },
+        { label: 'Show 3D Gravity Well', command: 'vestige.showGravityWell', detail: 'Architectural coupling visualization' }
+    ];
+
+    const selected = await vscode.window.showQuickPick(commands, {
+        placeHolder: 'Vestige: Search commands...',
+        matchOnDescription: true,
+        matchOnDetail: true
+    });
+
+    if (selected) {
+        vscode.commands.executeCommand(selected.command);
+    }
+}
+
+/**
+ * Centurion: Celebrate the end of a legacy codebase.
+ */
+async function generateObituary(filePath, linesRemoved) {
+    const obit = `
+🕯️ **Code Obituary: ${path.basename(filePath)}**
+Born in a forgotten commit, this module served faithfully for ${linesRemoved} lines of logic.
+It survived 12 refactors and saw 5 different system architects.
+May its patterns be remembered, and its bugs remain buried.
+    `;
+    vscode.window.showInformationMessage(obit, { modal: true });
 }
 
 module.exports = {

@@ -176,16 +176,42 @@ class GravityWellPanel {
             particlesMesh.geometry.attributes.position.needsUpdate = true;
             particlesMesh.rotation.y += 0.001;
 
-            // Interaction Check
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(satellites);
-            
-            satellites.forEach(s => s.material.emissiveIntensity = 1);
-            if (intersects.length > 0) {
-                const hovered = intersects[0].object;
-                hovered.material.emissiveIntensity = 5;
-                // We could show a tooltip here in screen space
+        // Impact Ripples (Phase Zenith)
+        const ripples = [];
+        const rippleGeo = new THREE.RingGeometry(0, 1, 32);
+        
+        function addRipple(x, y, z) {
+            const mat = new THREE.MeshBasicMaterial({ color: 0x60A5FA, transparent: true, side: THREE.DoubleSide });
+            const ripple = new THREE.Mesh(rippleGeo, mat);
+            ripple.position.set(x, y, z);
+            ripple.rotation.x = Math.PI / 2;
+            scene.add(ripple);
+            ripples.push({ mesh: ripple, size: 0, alpha: 1 });
+        }
+
+        // Interaction Check
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(satellites);
+        
+        satellites.forEach(s => s.material.emissiveIntensity = 1);
+        if (intersects.length > 0) {
+            const hovered = intersects[0].object;
+            hovered.material.emissiveIntensity = 5;
+            if (frame % 30 < 1) addRipple(hovered.position.x, hovered.position.y, hovered.position.z);
+        }
+
+        // Update Ripples
+        for (let i = ripples.length - 1; i >= 0; i--) {
+            const r = ripples[i];
+            r.size += 0.5;
+            r.alpha -= 0.02;
+            r.mesh.scale.set(r.size, r.size, 1);
+            r.mesh.material.opacity = r.alpha;
+            if (r.alpha <= 0) {
+                scene.remove(r.mesh);
+                ripples.splice(i, 1);
             }
+        }
 
             renderer.render(scene, camera);
         }

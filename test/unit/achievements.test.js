@@ -1,33 +1,42 @@
 const assert = require('assert');
-const achievements = require('../../achievements');
+const AchievementSystem = require('../../achievements');
+const vscode = require('vscode');
 
 suite('Achievements Test Suite', () => {
+    let achievements;
+    let mockStorage;
+
     setup(() => {
-        // Reset achievements state
-        achievements.credits = 0;
-        achievements.unlocked = [];
+        const state = {};
+        mockStorage = {
+            get: (key) => state[key],
+            update: async (key, value) => { state[key] = value; }
+        };
+        const mockContext = { globalState: mockStorage };
+        achievements = new AchievementSystem(mockContext);
     });
 
-    test('trackAction awards credits', () => {
-        achievements.trackAction('test_action', 5);
-        assert.strictEqual(achievements.getCredits(), 50);
+    test('trackAction awards credits', async () => {
+        await achievements.trackAction('viewOldFile', 1);
+        assert.strictEqual(achievements.getCredits(), 10);
     });
 
-    test('isFeatureUnlocked handles credit-based locks', () => {
+    test('isFeatureUnlocked handles credit-based locks', async () => {
         assert.strictEqual(achievements.isFeatureUnlocked('wormhole'), false);
-        achievements.addCredits(500);
+        await achievements.addCredits(500);
         assert.strictEqual(achievements.isFeatureUnlocked('wormhole'), true);
     });
 
-    test('isFeatureUnlocked handles achievement-based locks', () => {
+    test('isFeatureUnlocked handles achievement-based locks', async () => {
         assert.strictEqual(achievements.isFeatureUnlocked('timeMachine'), false);
-        achievements.unlocked.push('time_traveler');
+        // Simulate achievement unlock
+        await mockStorage.update('vestige.unlocked', ['time_traveler']);
         assert.strictEqual(achievements.isFeatureUnlocked('timeMachine'), true);
     });
 
-    test('isFeatureUnlocked handles complexity-based locks', () => {
+    test('isFeatureUnlocked handles complexity-based locks', async () => {
         assert.strictEqual(achievements.isFeatureUnlocked('ghostCursor'), false);
-        achievements.unlocked = ['a1', 'a2', 'a3'];
+        await mockStorage.update('vestige.unlocked', ['a1', 'a2', 'a3']);
         assert.strictEqual(achievements.isFeatureUnlocked('ghostCursor'), true);
     });
 });

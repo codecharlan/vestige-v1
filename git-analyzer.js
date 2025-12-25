@@ -1111,7 +1111,7 @@ class GitAnalyzer {
     /**
      * Master Analysis Engine: Orchestrates all temporal and structural insights
      */
-    async analyzeFile(repoPath, filePath) {
+    async analyzeFile(repoPath, filePath, force = false, context = null) {
         const git = simpleGit(repoPath);
         const relativePath = path.relative(repoPath, filePath);
 
@@ -1120,6 +1120,17 @@ class GitAnalyzer {
             await git.raw(['ls-files', '--error-unmatch', relativePath]);
         } catch (e) {
             throw new Error('File is not tracked by git');
+        }
+
+        // Phase 5: Incremental Analysis & Caching
+        if (context && !force) {
+            const head = await git.revparse(['HEAD']);
+            const cacheKey = `vestige.cache.${relativePath}.${head}`;
+            const cached = context.globalState.get(cacheKey);
+            if (cached) {
+                console.log(`Vestige: High-speed incremental hit for ${relativePath}`);
+                return JSON.parse(cached);
+            }
         }
 
         const lines = await this.getFileTimeline(repoPath, filePath);
@@ -1150,7 +1161,7 @@ class GitAnalyzer {
             implicitLore: [...implicitLore, ...shadowLore, ...implicitFAQ, ...vendorPivots, ...emergingPatterns]
         });
 
-        return {
+        const result = {
             lines,
             churn,
             originalityIndex: originality,
