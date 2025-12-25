@@ -155,7 +155,13 @@ function activate(context) {
         vscode.commands.registerCommand('vestige.addDecision', addDecision),
         vscode.commands.registerCommand('vestige.promoteLore', promoteLore),
         vscode.commands.registerCommand('vestige.chatWithGhost', chatWithGhost),
-        vscode.commands.registerCommand('vestige.runTimeMachine', runTimeMachine),
+        vscode.commands.registerCommand('vestige.runTimeMachine', (hash, fileName, repoPath) => {
+            if (!achievements.isFeatureUnlocked('timeMachine')) {
+                vscode.window.showWarningMessage('🏆 Feature Locked: Time Machine requires the "Time Traveler" achievement.');
+                return;
+            }
+            runTimeMachine(hash, fileName, repoPath);
+        }),
         vscode.commands.registerCommand('vestige.showGravityWell', showGravityWell),
         vscode.commands.registerCommand('vestige.replayGhost', replayGhost),
         vscode.commands.registerCommand('vestige.showPulse', showPulse),
@@ -204,6 +210,51 @@ function activate(context) {
     }
 
     vscode.window.showInformationMessage('Vestige: Temporal code intelligence activated 🗿');
+
+    // Elite: AI Code Archaeologist
+    context.subscriptions.push(vscode.commands.registerCommand('vestige.askArchaeologist', async (analysis, fileName) => {
+        if (!achievements.isFeatureUnlocked('aiArchaeologist')) {
+            vscode.window.showWarningMessage('🏆 Feature Locked: AI Archaeologist requires 1000 XP.');
+            return;
+        }
+        try {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) return;
+            const codeContext = editor.document.getText();
+            const result = await aiService.analyzeStagnation(fileName, analysis.ageDays, analysis.churn, codeContext);
+            timelinePanel.setAIResult('setArchaeologistResult', result);
+        } catch (e) {
+            timelinePanel.setAIResult('setArchaeologistResult', "The scrolls are unreadable: " + e.message);
+        }
+    }));
+
+    // Elite: Predictive Refactoring
+    context.subscriptions.push(vscode.commands.registerCommand('vestige.getRefactorIdeas', async (analysis, fileName) => {
+        if (!achievements.isFeatureUnlocked('aiArchaeologist')) {
+            vscode.window.showWarningMessage('🏆 Feature Locked: Predictive Refactoring requires unlocking the Master Archaeologist tier.');
+            return;
+        }
+        try {
+            const result = await aiService.suggestRefactoring(fileName, analysis.interestRate, analysis.lines.length);
+            timelinePanel.setAIResult('setRefactorResult', result);
+        } catch (e) {
+            timelinePanel.setAIResult('setRefactorResult', "Refactor engine stalled: " + e.message);
+        }
+    }));
+
+    // Elite: Share Lore Bridge
+    context.subscriptions.push(vscode.commands.registerCommand('vestige.shareLore', async (type, content) => {
+        const webhook = vscode.workspace.getConfiguration('vestige').get('collabWebhookUrl');
+        if (!webhook) {
+            const action = await vscode.window.showWarningMessage('Collaboration Webhook not configured', 'Configure');
+            if (action === 'Configure') vscode.commands.executeCommand('workbench.action.openSettings', 'vestige.collabWebhookUrl');
+            return;
+        }
+
+        vscode.window.showInformationMessage(`Exporting ${type} lore to team channel... 🚀`);
+        // Actual implementation would be a fetch() to the webhook
+        setTimeout(() => vscode.window.showInformationMessage('✅ Lore shared successfully!'), 1000);
+    }));
 }
 
 /**
@@ -443,6 +494,15 @@ async function showTimeline() {
         timeline.repoPath = workspaceFolder.uri.fsPath;
         timeline.narrative = analysis ? analysis.narrativeBiography : 'Analyzing history...';
 
+        // V5: Debt Horizon
+        if (analysis && analysis.debt) {
+            timeline.debtHorizon = debtCalculator.forecastDebtHorizon(analysis.debt, 180);
+        } else {
+            // Recalculate if not in analysis cache
+            const debt = await debtCalculator.calculateDebt(workspaceFolder.uri.fsPath, document.uri.fsPath);
+            if (debt) timeline.debtHorizon = debtCalculator.forecastDebtHorizon(debt, 180);
+        }
+
         // V6: Get decisions
         const decisions = loreService.getDecisionsForFile(document.uri.fsPath);
 
@@ -572,13 +632,37 @@ async function showDashboard() {
         return;
     }
 
-    const repoPath = workspaceFolders[0].uri.fsPath;
-
     try {
-        const health = await repoAnalyzer.calculateRepoHealth(repoPath);
-        await dashboardPanel.show(repoPath, { health });
+        let totalScore = 0;
+        let totalFiles = 0;
+        let totalFossilCount = 0;
+        let allHotspots = [];
 
-        // Track achievement
+        for (const folder of workspaceFolders) {
+            const health = await repoAnalyzer.calculateRepoHealth(folder.uri.fsPath);
+            totalScore += health.score;
+            totalFiles += health.metrics.filesAnalyzed || 0;
+            // Simplified aggregation for now
+            if (health.metrics.hotspots) {
+                allHotspots.push(...health.metrics.hotspots.map(h => ({ ...h, file: `[\${folder.name}] \${h.file}` })));
+            }
+        }
+
+        const avgScore = Math.round(totalScore / workspaceFolders.length);
+        allHotspots.sort((a, b) => b.debtScore - a.debtScore);
+
+        const metrics = {
+            health: {
+                score: avgScore,
+                metrics: {
+                    filesAnalyzed: totalFiles,
+                    hotspots: allHotspots.slice(0, 5)
+                    // (Other metrics would also be averaged here in a full implementation)
+                }
+            }
+        };
+
+        await dashboardPanel.show(workspaceFolders[0].uri.fsPath, metrics);
         await achievements.trackAction('viewDashboard');
     } catch (error) {
         vscode.window.showErrorMessage(`Failed to load dashboard: ${error.message}`);

@@ -17,7 +17,8 @@ class DashboardPanel {
                 vscode.ViewColumn.One,
                 {
                     enableScripts: true,
-                    retainContextWhenHidden: true
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [this.context.extensionUri]
                 }
             );
 
@@ -30,29 +31,23 @@ class DashboardPanel {
     }
 
     getWebviewContent(metrics) {
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'vestige.css'));
+
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vestige Dashboard</title>
+    <link rel="stylesheet" href="${cssUri}">
     <style>
-        body {
-            font-family: var(--vscode-font-family);
-            color: var(--vscode-foreground);
-            background-color: var(--vscode-editor-background);
-            padding: 20px;
-            margin: 0;
-        }
-        h1 {
-            font-size: 1.8em;
-            margin-bottom: 10px;
-        }
+        body { padding: 30px; }
         .health-score {
             font-size: 4em;
             text-align: center;
             margin: 30px 0;
             font-weight: bold;
+            font-family: 'Inter', sans-serif;
         }
         .health-score.excellent { color: #90be6d; }
         .health-score.good { color: #f9c74f; }
@@ -157,6 +152,22 @@ class DashboardPanel {
             </div>
         </div>
     </div>
+
+    ${metrics.health.metrics.hotspots && metrics.health.metrics.hotspots.length > 0 ? `
+        <div class="chart">
+            <h2>🔥 Debt Hotspots</h2>
+            <div style="font-size: 0.9em; margin-bottom: 15px; color: var(--vscode-descriptionForeground);">Top 5 files requiring remediation (Predicted ROI: High)</div>
+            ${metrics.health.metrics.hotspots.map(h => `
+                <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--vscode-textBlockQuote-border);">
+                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: var(--vscode-textLink-foreground);">${h.file}</div>
+                    <div style="text-align: right;">
+                        <span style="font-weight: bold; color: #ff5252;">$${h.cost.toLocaleString()}</span>
+                        <div style="font-size: 0.7em; color: var(--vscode-descriptionForeground);">Score: ${h.debtScore}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    ` : ''}
 
     <div style="margin-top: 40px; padding: 20px; background: var(--vscode-textBlockQuote-background); border-radius: 8px;">
         <h3>💡 Recommendations</h3>

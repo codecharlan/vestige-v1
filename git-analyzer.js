@@ -63,23 +63,6 @@ class GitAnalyzer {
         }
     }
 
-    async detectZombieCode(repoPath, filePath) {
-        const stats = await this.getFileStats(repoPath, filePath);
-        if (!stats) return null;
-
-        const zombieDays = vscode.workspace.getConfiguration('vestige').get('zombieAgeDays') || 365;
-        const msPerDay = 1000 * 60 * 60 * 24;
-        const daysSinceLastCommit = (new Date() - stats.lastCommitDate) / msPerDay;
-
-        if (daysSinceLastCommit > zombieDays) {
-            return {
-                isZombie: true,
-                days: Math.floor(daysSinceLastCommit),
-                lastAuthor: stats.lastAuthor
-            };
-        }
-        return null;
-    }
 
     async getFileTimeline(repoPath, filePath) {
         const git = simpleGit(repoPath);

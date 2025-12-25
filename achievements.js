@@ -74,8 +74,20 @@ class AchievementSystem {
         stats[actionType] = (stats[actionType] || 0) + value;
         await this.storage.update('vestige.achievements', stats);
 
+        // Code Archeology Credits (XP)
+        await this.addCredits(value * 10);
+
         // Check for new achievements
         this.checkAchievements(actionType, stats[actionType]);
+    }
+
+    async addCredits(amount) {
+        const credits = this.getCredits();
+        await this.storage.update('vestige.credits', credits + amount);
+    }
+
+    getCredits() {
+        return this.storage.get('vestige.credits') || 0;
     }
 
     getStats() {
@@ -84,6 +96,22 @@ class AchievementSystem {
 
     getUnlocked() {
         return this.storage.get('vestige.unlocked') || [];
+    }
+
+    /**
+     * Temporal Discovery: Advanced features unlock as you explore history.
+     */
+    isFeatureUnlocked(featureId) {
+        const unlocked = this.getUnlocked();
+        const credits = this.getCredits();
+
+        switch (featureId) {
+            case 'timeMachine': return unlocked.includes('time_traveler');
+            case 'wormhole': return credits >= 500;
+            case 'ghostCursor': return unlocked.length >= 3;
+            case 'aiArchaeologist': return credits >= 1000;
+            default: return true;
+        }
     }
 
     async checkAchievements(actionType, count, analysis = null) {

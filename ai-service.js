@@ -50,6 +50,27 @@ Explain the change:`;
         }
     }
 
+    async explainDiff(filePath, commitHash, gitAnalyzer, repoPath) {
+        const apiKey = vscode.workspace.getConfiguration('vestige').get('openaiApiKey');
+        if (!apiKey) {
+            throw new Error('OpenAI API key not configured. Set it in Vestige settings.');
+        }
+
+        const git = gitAnalyzer.git;
+        let diff = '';
+        let message = '';
+
+        try {
+            diff = await git.show([commitHash, '--', filePath]);
+            message = await git.raw(['show', '-s', '--format=%B', commitHash]);
+        } catch (e) {
+            console.error('Failed to fetch diff/message for AI', e);
+            throw new Error('Could not retrieve commit details');
+        }
+
+        return await this.explainCommit(diff, message, apiKey);
+    }
+
     async explainText(prompt) {
         const apiKey = vscode.workspace.getConfiguration('vestige').get('openaiApiKey');
         if (!apiKey) {
@@ -129,6 +150,38 @@ Explain the change:`;
         } catch (e) {
             return "The temporal connection failed.";
         }
+    }
+
+    /**
+     * AI Code Archaeologist: Analyze why code has remained stagnant.
+     */
+    async analyzeStagnation(filePath, ageDays, churnMetrics, codeContext) {
+        const apiKey = vscode.workspace.getConfiguration('vestige').get('openaiApiKey');
+        if (!apiKey) throw new Error('API Key missing');
+
+        const prompt = `You are a Code Archaeologist. Analyze this file that hasn't changed in ${ageDays} days.
+        
+File: ${filePath}
+Recent Churn around it: ${JSON.stringify(churnMetrics)}
+Code Snippet:
+${codeContext.substring(0, 1000)}
+
+Hypothesize why this code persists. Is it a "Load-Bearing Wall" (critical but untouchable), "Sunken Treasure" (valuable but forgotten), or a "Zombie" (useless but lurking)? Provide a technical and philosophical explanation in 3-4 sentences.`;
+
+        return await this.explainText(prompt);
+    }
+
+    /**
+     * Predictive Refactoring: Suggest improvements based on debt.
+     */
+    async suggestRefactoring(filePath, debtScore, complexity) {
+        const prompt = `Analyze this file with a Debt Score of ${debtScore} and Complexity of ${complexity}.
+        
+File: ${filePath}
+
+Suggest 3 specific, high-impact refactorings to reduce technical debt and improve temporal stability. Focus on "ROI-driven" refactoring.`;
+
+        return await this.explainText(prompt);
     }
 }
 

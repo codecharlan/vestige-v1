@@ -1,0 +1,113 @@
+:root {
+    /* Modern Colors */
+    --vestige-green: #10B981;
+    --vestige-amber: #F59E0B;
+    --vestige-red: #EF4444;
+    --vestige-purple: #8B5CF6;
+    --vestige-blue: #3B82F6;
+    --vestige-pink: #F472B6;
+
+    /* Backgrounds & Surfaces */
+    --vestige-bg: var(--vscode-editor-background);
+    --vestige-surface: rgba(255, 255, 255, 0.03);
+    --vestige-border: rgba(255, 255, 255, 0.1);
+
+    /* Glassmorphism */
+    --vestige-glass: rgba(255, 255, 255, 0.05);
+    --vestige-glass-blur: blur(12px);
+
+    /* Neumorphism (Soft Shadows) */
+    --vestige-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Base Styles */
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    line-height: 1.6;
+    padding: 30px;
+    margin: 0;
+    background-color: var(--vestige-bg);
+    color: var(--vscode-foreground);
+}
+
+/* Glass Card */
+.glass-card {
+    background: var(--vestige-glass);
+    backdrop-filter: var(--vestige-glass-blur);
+    -webkit-backdrop-filter: var(--vestige-glass-blur);
+    border: 1px solid var(--vestige-border);
+    border-radius: 12px;
+    box-shadow: var(--vestige-shadow);
+    padding: 20px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* Typography Enhancements */
+h1,
+h2,
+h3 {
+    letter-spacing: -0.02em;
+    font-family: 'Inter', -apple-system, sans-serif;
+}
+
+h1 {
+    font-size: 2.2em;
+    font-weight: 800;
+    margin-bottom: 24px;
+}
+
+h2 {
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-top: 32px;
+}
+
+.mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Premium Animated Gradients */
+.gradient-text {
+    background: linear-gradient(90deg, var(--vestige-blue), var(--vestige-purple), var(--vestige-pink));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% auto;
+    animation: shine 4s linear infinite;
+}
+
+@keyframes shine {
+    to {
+        background-position: 200% center;
+    }
+}
+
+/* Tooltip Simulation via Micro-interactions */
+.stat-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    border-color: var(--vestige-blue);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Accessibility & Utility */
+.badge {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 800;
+}

@@ -2,8 +2,12 @@
     "name": "vestige",
     "displayName": "Vestige - Temporal Code Intelligence",
     "description": "Uncover the traces of your codebase through time. Inline temporal linting that reveals code age, churn, and evolution.",
-    "version": "0.1.0",
+    "version": "1.0.2",
     "publisher": "codecharlan",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/codecharlan/vestige-v1"
+    },
     "icon": "images/icon.png",
     "engines": {
         "vscode": "^1.80.0"
@@ -153,6 +157,11 @@
                     "type": "number",
                     "default": 5,
                     "description": "Number of distinct authors to mark as Hot Potato (🔥)"
+                },
+                "vestige.collabWebhookUrl": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Slack/Discord webhook URL for sharing Lore insights"
                 }
             }
         },
@@ -160,7 +169,8 @@
             "explorer": [
                 {
                     "id": "vestige.graveyard",
-                    "name": "💀 Code Graveyard"
+                    "name": "💀 Code Graveyard",
+                    "icon": "images/ghost.svg"
                 }
             ]
         }

@@ -16,7 +16,8 @@ class PerformancePanel {
                 vscode.ViewColumn.Two,
                 {
                     enableScripts: true,
-                    retainContextWhenHidden: true
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [this.context.extensionUri]
                 }
             );
 
@@ -29,25 +30,26 @@ class PerformancePanel {
     }
 
     getWebviewContent() {
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'vestige.css'));
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Performance Timeline</title>
+    <link rel="stylesheet" href="${cssUri}">
     <style>
-        body {
-            font-family: var(--vscode-font-family);
-            padding: 20px;
-        }
+        body { padding: 30px; }
         .chart-container {
             height: 300px;
             margin: 20px 0;
-            background: var(--vscode-editor-inactiveSelectionBackground);
+            background: var(--vestige-surface);
+            border: 1px solid var(--vestige-border);
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
+            border-radius: 12px;
+            backdrop-filter: var(--vestige-glass-blur);
         }
     </style>
 </head>

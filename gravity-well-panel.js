@@ -15,7 +15,11 @@ class GravityWellPanel {
                 'vestige.gravityWell',
                 'Vestige: 3D Gravity Well',
                 vscode.ViewColumn.One,
-                { enableScripts: true, retainContextWhenHidden: true }
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [this.context.extensionUri]
+                }
             );
             this.panel.onDidDispose(() => { this.panel = null; });
         }
@@ -31,11 +35,14 @@ class GravityWellPanel {
             distance: Math.max(10, 100 - n.strength * 5)
         }));
 
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'vestige.css'));
+
         return `<!DOCTYPE html>
 <html>
 <head>
+    <link rel="stylesheet" href="${cssUri}">
     <style>
-        body { margin: 0; background: #0F172A; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; background: #0F172A; overflow: hidden; }
         #label { position: absolute; top: 20px; left: 20px; color: #60A5FA; font-size: 1.2em; font-weight: bold; pointer-events: none; }
     </style>
 </head>
@@ -122,6 +129,19 @@ class GravityWellPanel {
         camera.position.z = 100;
 
         let frame = 0;
+        const mouse = new THREE.Vector2();
+        const raycaster = new THREE.Raycaster();
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Subtle camera tilt
+            camera.position.x += (mouse.x * 10 - camera.position.x) * 0.05;
+            camera.position.y += (-mouse.y * 10 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+        });
+
         function animate() {
             requestAnimationFrame(animate);
             frame += 0.01;
@@ -131,6 +151,10 @@ class GravityWellPanel {
                 s.position.x = Math.cos(s.userData.angle) * s.userData.distance;
                 s.position.z = Math.sin(s.userData.angle) * s.userData.distance;
                 s.position.y += Math.sin(frame + s.userData.angle) * 0.02;
+                
+                // Pulsate scale based on strength
+                const pulseScale = 1 + Math.sin(frame * 3 + s.userData.angle) * 0.1;
+                s.scale.set(pulseScale, pulseScale, pulseScale);
             });
 
             // Core Pulse
@@ -138,14 +162,30 @@ class GravityWellPanel {
             core.scale.set(pulse, pulse, pulse);
             core.rotation.y += 0.005;
 
-            // Particle movement
+            // Particle movement (Entropy flow)
             const positions = particlesMesh.geometry.attributes.position.array;
-            for(let i=0; i < particlesCount * 3; i++) {
+            for(let i=0; i < particlesCount * 3; i+=3) {
                 positions[i] += velocityArray[i];
-                if (Math.abs(positions[i]) > 50) positions[i] *= -0.9;
+                positions[i+1] += velocityArray[i+1];
+                positions[i+2] += velocityArray[i+2];
+                
+                if (Math.abs(positions[i]) > 100) positions[i] *= -0.9;
+                if (Math.abs(positions[i+1]) > 50) positions[i+1] *= -0.9;
+                if (Math.abs(positions[i+2]) > 100) positions[i+2] *= -0.9;
             }
             particlesMesh.geometry.attributes.position.needsUpdate = true;
             particlesMesh.rotation.y += 0.001;
+
+            // Interaction Check
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(satellites);
+            
+            satellites.forEach(s => s.material.emissiveIntensity = 1);
+            if (intersects.length > 0) {
+                const hovered = intersects[0].object;
+                hovered.material.emissiveIntensity = 5;
+                // We could show a tooltip here in screen space
+            }
 
             renderer.render(scene, camera);
         }

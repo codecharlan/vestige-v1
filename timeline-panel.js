@@ -29,6 +29,12 @@ class TimelinePanel {
         }
     }
 
+    setAIResult(command, text) {
+        if (this.panel) {
+            this.panel.webview.postMessage({ command, text });
+        }
+    }
+
     show(analysis, filePath, decisions = []) {
         const fileName = path.basename(filePath);
         this.currentFileName = fileName;
@@ -41,7 +47,11 @@ class TimelinePanel {
                 'vestige.timeline',
                 `Vestige Timeline: ${fileName}`,
                 vscode.ViewColumn.Two,
-                { enableScripts: true, retainContextWhenHidden: true }
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [this.context.extensionUri]
+                }
             );
 
             this.panel.webview.onDidReceiveMessage(message => {
@@ -55,6 +65,9 @@ class TimelinePanel {
                     case 'chatWithGhost':
                         vscode.commands.executeCommand('vestige.chatWithGhost', message.author, message.hash, analysis.repoPath, fileName);
                         break;
+                    case 'shareLore':
+                        vscode.commands.executeCommand('vestige.shareLore', message.loreType, message.content);
+                        break;
                     case 'runTimeMachine':
                         vscode.commands.executeCommand('vestige.runTimeMachine', message.hash, fileName, analysis.repoPath);
                         break;
@@ -66,6 +79,12 @@ class TimelinePanel {
                         break;
                     case 'openWormhole':
                         vscode.commands.executeCommand('vestige.openWormhole', message.hash);
+                        break;
+                    case 'askArchaeologist':
+                        vscode.commands.executeCommand('vestige.askArchaeologist', analysis, fileName);
+                        break;
+                    case 'getRefactorIdeas':
+                        vscode.commands.executeCommand('vestige.getRefactorIdeas', analysis, fileName);
                         break;
                 }
             });
@@ -84,17 +103,18 @@ class TimelinePanel {
         const implicitLore = analysis.implicitLore || [];
         const bio = analysis.narrativeBiography || 'Analyzing intelligence...';
 
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'vestige.css'));
+
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vestige Timeline</title>
+    <link rel="stylesheet" href="${cssUri}">
     <style>
         :root {
             --accent: #60A5FA;
-            --surface: rgba(255, 255, 255, 0.03);
-            --border: rgba(255, 255, 255, 0.1);
         }
         body {
             font-family: 'Inter', -apple-system, sans-serif;
@@ -190,6 +210,23 @@ class TimelinePanel {
             <span class="stat-value" style="color: ${this.getSafetyColor(analysis.safetyScore)}">${analysis.safetyScore || 0}%</span>
             <span class="stat-label">Safety</span>
         </div>
+        ${analysis.debtHorizon ? `
+            <div class="stat-card" style="border: 1px dashed var(--vestige-pink); background: rgba(244, 114, 182, 0.05);">
+                <span class="stat-value" style="color: var(--vestige-pink); font-size: 1em;">+$${analysis.debtHorizon.cost.toLocaleString()}</span>
+                <span class="stat-label">Horizon (6mo)</span>
+            </div>
+        ` : ''}
+    </div>
+
+    <div class="glass-card" style="margin-bottom: 25px; padding: 15px; border-top: 1px solid var(--vestige-purple);">
+        <div style="font-size: 0.8rem; color: var(--vestige-purple); font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span>💬</span> NATURAL LANGUAGE ARCHAEOLOGIST
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="nlQuery" placeholder="Ask about this file's history... (e.g., 'Who is the main owner?')" 
+                   style="flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--vestige-border); color: white; padding: 8px 12px; border-radius: 6px; font-size: 0.9em;">
+            <button onclick="askNL()" style="margin: 0; padding: 0 15px; border-color: var(--vestige-purple); color: var(--vestige-purple); background: rgba(139, 92, 246, 0.1);">Consult AI</button>
+        </div>
     </div>
 
     <div style="display: flex; gap: 8px; margin-bottom: 30px;">
@@ -207,6 +244,30 @@ class TimelinePanel {
         </div>
     ` : ''}
 
+    ${analysis.ageDays > 30 ? `
+        <div class="section-header">🕵️ AI Code Archaeologist</div>
+        <div class="stat-card" style="border-left: 4px solid var(--vestige-purple); background: var(--vestige-glass);">
+            <div id="archaeologist-content" style="font-style: italic; color: var(--vestige-text-alt);">
+                Analyzing why this file has been stagnant for ${analysis.ageDays} days...
+            </div>
+            <button onclick="askArchaeologist()" style="margin-top: 10px; border-color: var(--vestige-purple); color: var(--vestige-purple);">
+                Consult the Archaeologist
+            </button>
+        </div>
+    ` : ''}
+
+    ${analysis.safetyScore < 70 ? `
+        <div class="section-header">🛠️ Predictive Refactoring</div>
+        <div class="stat-card" style="border-left: 4px solid var(--vestige-pink); background: var(--vestige-glass);">
+            <div id="refactor-content" style="color: var(--vestige-text-alt);">
+                Refactor Safety Score is low (${analysis.safetyScore}%). AI suggests high-ROI improvements.
+            </div>
+            <button onclick="getRefactorIdeas()" style="margin-top: 10px; border-color: var(--vestige-pink); color: var(--vestige-pink);">
+                Generate Refactor Plan
+            </button>
+        </div>
+    ` : ''}
+
     ${analysis.archDrift ? `
         <div class="bio-box" style="border-left-color: #ff5252; background: rgba(255, 82, 82, 0.05); margin-bottom: 20px;">
             <strong style="color: #ff5252;">⚠️ Architectural Drift Warning</strong><br/>
@@ -219,9 +280,12 @@ class TimelinePanel {
             <div class="section-header">👻 Ghost Lore</div>
             <div class="stat-card" style="text-align: left; max-height: 200px; overflow-y: auto;">
                 ${implicitLore.length > 0 ? implicitLore.map(l => `
-                    <div style="margin-bottom: 10px; font-size: 0.85em; cursor: pointer;" onclick="promoteLore('${l.type}', '${this.escapeJs(l.content)}', '${l.hash}')">
-                        <span class="badge badge-ghost">${l.type.toUpperCase()}</span>
-                        <span style="color: #CBD5E1">"${l.content}"</span>
+                    <div style="margin-bottom: 10px; font-size: 0.85em; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="cursor: pointer; flex: 1;" onclick="promoteLore('${l.type}', '${this.escapeJs(l.content)}', '${l.hash}')">
+                            <span class="badge badge-ghost">${l.type.toUpperCase()}</span>
+                            <span style="color: #CBD5E1">"${l.content}"</span>
+                        </div>
+                        <button onclick="shareLore('${l.type}', '${this.escapeJs(l.content)}')" style="margin: 0; padding: 2px 6px; font-size: 0.7em; border-color: var(--vestige-blue); color: var(--vestige-blue);">🚀 Share</button>
                     </div>
                 `).join('') : '<span class="stat-label">No implicit insights</span>'}
             </div>
@@ -319,6 +383,32 @@ class TimelinePanel {
         function openWormhole(hash) {
             vscode.postMessage({ command: 'openWormhole', hash });
         }
+        function shareLore(type, content) {
+            vscode.postMessage({ command: 'shareLore', loreType: type, content });
+        }
+        function askNL() {
+            const query = document.getElementById('nlQuery').value;
+            if (!query) return;
+            document.getElementById('archaeologist-content').innerText = "Querying the timeline for '" + query + "'...";
+            vscode.postMessage({ command: 'askArchaeologist', text: query });
+        }
+        function askArchaeologist() {
+            document.getElementById('archaeologist-content').innerText = "Consulting the scrolls of time...";
+            vscode.postMessage({ command: 'askArchaeologist' });
+        }
+        function getRefactorIdeas() {
+            document.getElementById('refactor-content').innerText = "Calculating high-ROI refactor patterns...";
+            vscode.postMessage({ command: 'getRefactorIdeas' });
+        }
+        
+        window.addEventListener('message', event => {
+            const message = event.data;
+            if (message.command === 'setArchaeologistResult') {
+                document.getElementById('archaeologist-content').innerText = message.text;
+            } else if (message.command === 'setRefactorResult') {
+                document.getElementById('refactor-content').innerText = message.text;
+            }
+        });
     </script>
 </body>
 </html>`;

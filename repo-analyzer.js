@@ -26,6 +26,7 @@ class RepoAnalyzer {
             let fossilCount = 0;
             let highChurnCount = 0;
             let validFiles = 0;
+            let hotspots = [];
 
             for (const file of sampledFiles) {
                 const filePath = path.join(repoPath, file);
@@ -52,11 +53,25 @@ class RepoAnalyzer {
                     if (busFactor && busFactor.busFactor > 0) {
                         totalBusFactor += busFactor.busFactor;
                     }
+
+                    // Calculate Debt for hotspots
+                    const debt = await this.gitAnalyzer.calculateTechnicalDebt(repoPath, filePath);
+                    if (debt) {
+                        hotspots.push({
+                            file: file,
+                            debtScore: debt.score,
+                            cost: debt.cost
+                        });
+                    }
                 } catch (e) {
                     // Skip files that can't be analyzed
                     continue;
                 }
             }
+
+            // Pick Top 5 hotspots
+            hotspots.sort((a, b) => b.debtScore - a.debtScore);
+            const topHotspots = hotspots.slice(0, 5);
 
             if (validFiles === 0) {
                 return { score: 5, metrics: { error: 'No analyzable files' } };
@@ -90,7 +105,8 @@ class RepoAnalyzer {
                     avgBusFactor: avgBusFactor.toFixed(1),
                     fossilPercent: Math.round(fossilPercent),
                     churnPercent: Math.round(churnPercent),
-                    filesAnalyzed: validFiles
+                    filesAnalyzed: validFiles,
+                    hotspots: topHotspots
                 }
             };
         } catch (error) {

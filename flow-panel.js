@@ -16,7 +16,8 @@ class FlowPanel {
                 vscode.ViewColumn.Two,
                 {
                     enableScripts: true,
-                    retainContextWhenHidden: true
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [this.context.extensionUri]
                 }
             );
 
@@ -29,27 +30,28 @@ class FlowPanel {
     }
 
     getWebviewContent() {
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'vestige.css'));
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Flow Visualizer</title>
+    <link rel="stylesheet" href="${cssUri}">
     <style>
         body {
-            font-family: var(--vscode-font-family);
-            padding: 20px;
-            background-color: #1e1e1e;
-            color: #fff;
+            padding: 30px;
+            background-color: var(--vestige-bg);
             overflow: hidden;
         }
         .canvas-container {
             width: 100%;
             height: 500px;
             position: relative;
-            border: 1px solid #333;
-            border-radius: 8px;
-            background: radial-gradient(circle at center, #252525 0%, #1e1e1e 100%);
+            border: 1px solid var(--vestige-border);
+            border-radius: 12px;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.02) 0%, transparent 100%);
+            backdrop-filter: var(--vestige-glass-blur);
         }
         .node {
             position: absolute;
