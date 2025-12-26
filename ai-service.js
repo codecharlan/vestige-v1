@@ -199,6 +199,85 @@ Suggest 3 specific, high-impact refactorings to reduce technical debt and improv
         const prompt = `Predict the stability impact (ROI) of this refactoring in ${filePath}: ${change}`;
         return await this.explainText(prompt);
     }
+
+    /**
+     * Onboarding: Generate friendly narrative for file history
+     * Creates a 2-3 sentence summary perfect for new developers
+     */
+    async generateOnboardingNarrative(milestones, fileName, facts) {
+        const apiKey = vscode.workspace.getConfiguration('vestige').get('openaiApiKey');
+        if (!apiKey) {
+            // Fallback to template-based narrative if no API key
+            return this.generateFallbackNarrative(milestones, fileName, facts);
+        }
+
+        const milestonesSummary = milestones.slice(0, 5).map(m =>
+            `${m.icon} ${m.type}: ${m.content} (${m.author || 'Unknown'})`
+        ).join('\n');
+
+        const prompt = `You are onboarding a new developer to a codebase. Create a friendly, concise narrative (2-3 sentences) about this file's history.
+
+File: ${fileName}
+Age: ${facts.age} days
+Total Changes: ${facts.totalCommits}
+Contributors: ${facts.contributors}
+
+Key Milestones:
+${milestonesSummary}
+
+Write a welcoming summary that:
+1. Explains when and why this file was created
+2. Highlights 1-2 major changes or patterns
+3. Mentions current state and who maintains it
+
+Keep it conversational and helpful for someone new to the codebase.`;
+
+        try {
+            const narrative = await this.explainText(prompt);
+            return narrative;
+        } catch (error) {
+            console.error('AI narrative generation failed:', error);
+            return this.generateFallbackNarrative(milestones, fileName, facts);
+        }
+    }
+
+    /**
+     * Fallback narrative generator (no AI required)
+     */
+    generateFallbackNarrative(milestones, fileName, facts) {
+        const birthMilestone = milestones.find(m => m.type === 'birth');
+        const creator = birthMilestone?.author || 'a developer';
+        const ageYears = Math.floor(facts.age / 365);
+        const ageDesc = ageYears > 0 ? `${ageYears} year${ageYears > 1 ? 's' : ''}` : `${facts.age} days`;
+
+        let narrative = `${fileName} was created ${ageDesc} ago by ${creator}. `;
+
+        if (facts.totalCommits > 50) {
+            narrative += `It has evolved through ${facts.totalCommits} changes by ${facts.contributors} contributor${facts.contributors > 1 ? 's' : ''}, `;
+        } else {
+            narrative += `It has seen ${facts.totalCommits} updates, `;
+        }
+
+        const majorMilestones = milestones.filter(m =>
+            ['refactor', 'architecture', 'security'].includes(m.type)
+        );
+
+        if (majorMilestones.length > 0) {
+            const latest = majorMilestones[0];
+            narrative += `including ${latest.content.toLowerCase()}. `;
+        } else {
+            narrative += `maintaining steady evolution. `;
+        }
+
+        const recentOwner = milestones.find(m => m.type === 'ownership-transition');
+        if (recentOwner) {
+            narrative += recentOwner.content + '.';
+        } else if (birthMilestone) {
+            narrative += `${birthMilestone.author} remains a key contributor.`;
+        }
+
+        return narrative;
+    }
 }
 
 module.exports = AIService;

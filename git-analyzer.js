@@ -887,32 +887,213 @@ class GitAnalyzer {
 
     /**
      * Elite: Generate Onboarding Tour
-     * Identifies key historical turning points
+     * Identifies key historical turning points for new developers
      */
     generateOnboardingTour(analysis) {
-        const { lines = [], churn } = analysis;
+        const { lines = [], churn = {}, implicitLore = [], epochs = [] } = analysis;
         const milestones = [];
+        const now = new Date();
 
-        // 1. First commit
+        // 1. Birth - First commit
         if (lines.length > 0) {
+            const firstLine = lines[lines.length - 1];
             milestones.push({
                 type: 'birth',
-                date: lines[lines.length - 1].date,
-                content: `File created by ${lines[lines.length - 1].author}.`
+                date: firstLine.date,
+                author: firstLine.author,
+                content: `File created by ${firstLine.author}`,
+                icon: '🌱',
+                importance: 10
             });
         }
 
-        // 2. High Churn Epochs (major refactors)
-        if (analysis.epochs) {
-            analysis.epochs.slice(0, 2).forEach(e => {
+        // 2. Major Refactors - Commits with significant line changes
+        if (churn.commits && churn.commits.length > 0) {
+            const majorRefactors = churn.commits
+                .filter(c => {
+                    // Estimate lines changed from message or use a threshold
+                    const msg = c.message.toLowerCase();
+                    return msg.includes('refactor') || msg.includes('rewrite') || msg.includes('restructure');
+                })
+                .slice(0, 3);
+
+            majorRefactors.forEach(c => {
                 milestones.push({
-                    type: 'epoch',
-                    content: `Major Era: ${e.name} (${e.period})`
+                    type: 'refactor',
+                    date: new Date(c.date),
+                    author: c.author_name,
+                    content: `Major refactor: ${c.message.split('\n')[0]}`,
+                    hash: c.hash,
+                    icon: '🔄',
+                    importance: 8
                 });
             });
         }
 
-        return milestones;
+        // 3. Bug Fix Clusters - High bug activity periods
+        if (churn.commits && churn.commits.length > 0) {
+            const bugFixes = churn.commits.filter(c =>
+                /fix|bug|issue|patch|hotfix/i.test(c.message)
+            );
+
+            if (bugFixes.length > 5) {
+                milestones.push({
+                    type: 'bugfix-cluster',
+                    date: bugFixes[0] ? new Date(bugFixes[0].date) : now,
+                    content: `High bug activity period: ${bugFixes.length} fixes recorded`,
+                    icon: '🐛',
+                    importance: 6
+                });
+            }
+        }
+
+        // 4. Ownership Transitions - When primary maintainer changed
+        if (lines.length > 0) {
+            const authorsByPeriod = {};
+            const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+            lines.forEach(l => {
+                const period = l.date > oneYearAgo ? 'recent' : 'legacy';
+                authorsByPeriod[period] = authorsByPeriod[period] || {};
+                authorsByPeriod[period][l.author] = (authorsByPeriod[period][l.author] || 0) + 1;
+            });
+
+            const legacyOwner = Object.entries(authorsByPeriod.legacy || {})
+                .sort((a, b) => b[1] - a[1])[0];
+            const recentOwner = Object.entries(authorsByPeriod.recent || {})
+                .sort((a, b) => b[1] - a[1])[0];
+
+            if (legacyOwner && recentOwner && legacyOwner[0] !== recentOwner[0]) {
+                milestones.push({
+                    type: 'ownership-transition',
+                    date: oneYearAgo,
+                    content: `Ownership transitioned from ${legacyOwner[0]} to ${recentOwner[0]}`,
+                    icon: '👥',
+                    importance: 7
+                });
+            }
+        }
+
+        // 5. Architectural Decisions - From implicit lore
+        const architecturalDecisions = implicitLore.filter(l =>
+            l.type === 'decision' || l.type === 'architecture'
+        );
+
+        architecturalDecisions.slice(0, 3).forEach(d => {
+            milestones.push({
+                type: 'architecture',
+                date: d.date,
+                author: d.author,
+                content: d.content,
+                hash: d.hash,
+                icon: '🏗️',
+                importance: 9
+            });
+        });
+
+        // 6. High Churn Epochs - Major development periods
+        epochs.slice(0, 2).forEach(e => {
+            milestones.push({
+                type: 'epoch',
+                date: new Date(e.period + '-01'),
+                content: `Major Era: ${e.name} (${e.commits} commits)`,
+                keywords: e.keywords,
+                icon: '⚡',
+                importance: 7
+            });
+        });
+
+        // 7. Dependency Changes - Major library updates
+        if (churn.commits && churn.commits.length > 0) {
+            const dependencyChanges = churn.commits.filter(c =>
+                /upgrade|update|migrate|dependency|package/i.test(c.message) &&
+                /version|v\d|@\d/i.test(c.message)
+            );
+
+            dependencyChanges.slice(0, 2).forEach(c => {
+                milestones.push({
+                    type: 'dependency',
+                    date: new Date(c.date),
+                    author: c.author_name,
+                    content: `Dependency update: ${c.message.split('\n')[0]}`,
+                    hash: c.hash,
+                    icon: '📦',
+                    importance: 5
+                });
+            });
+        }
+
+        // 8. Security Fixes - Critical patches
+        if (churn.commits && churn.commits.length > 0) {
+            const securityFixes = churn.commits.filter(c =>
+                /security|cve|vulnerability|exploit|xss|injection/i.test(c.message)
+            );
+
+            securityFixes.forEach(c => {
+                milestones.push({
+                    type: 'security',
+                    date: new Date(c.date),
+                    author: c.author_name,
+                    content: `Security fix: ${c.message.split('\n')[0]}`,
+                    hash: c.hash,
+                    icon: '🔒',
+                    importance: 10
+                });
+            });
+        }
+
+        // Sort by date (oldest first) and then by importance
+        return milestones
+            .sort((a, b) => {
+                const dateCompare = (a.date || now) - (b.date || now);
+                return dateCompare !== 0 ? dateCompare : (b.importance || 0) - (a.importance || 0);
+            })
+            .slice(0, 15); // Limit to top 15 milestones
+    }
+
+    /**
+     * Elite: Generate Onboarding Recommendations
+     * Provides expert contacts and related files for new developers
+     */
+    generateOnboardingRecommendations(analysis) {
+        const { busFactor, knowledgeNeighbors = [], churn = {} } = analysis;
+
+        // Expert recommendations from bus factor analysis
+        const experts = (busFactor?.contributors || [])
+            .slice(0, 3)
+            .map(c => ({
+                name: c.name,
+                ownership: c.percent,
+                linesOwned: c.linesOwned,
+                role: c.percent > 50 ? 'Primary Maintainer' :
+                    c.percent > 25 ? 'Core Contributor' : 'Contributor'
+            }));
+
+        // Related files from knowledge proximity
+        const relatedFiles = knowledgeNeighbors
+            .slice(0, 5)
+            .map(n => ({
+                file: n.name,
+                coupling: n.strength,
+                reason: n.strength > 7 ? 'Frequently changed together' :
+                    n.strength > 4 ? 'Often modified in same commits' :
+                        'Related by commit history'
+            }));
+
+        // Quick facts
+        const facts = {
+            age: analysis.ageDays || 0,
+            totalCommits: churn.totalCommits || 0,
+            contributors: (churn.authors || []).length,
+            lastModified: analysis.lastModified || new Date(),
+            complexity: analysis.lines?.length || 0
+        };
+
+        return {
+            experts,
+            relatedFiles,
+            facts
+        };
     }
 
     /**

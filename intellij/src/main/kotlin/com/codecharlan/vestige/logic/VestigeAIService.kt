@@ -193,4 +193,124 @@ class VestigeAIService {
             "AI error: ${e.message}"
         }
     }
+
+    /**
+     * Onboarding: Generate friendly narrative for file history
+     * Creates a 2-3 sentence summary perfect for new developers
+     */
+    fun generateOnboardingNarrative(
+        milestones: List<VestigeGitAnalyzer.OnboardingMilestone>,
+        fileName: String,
+        facts: VestigeGitAnalyzer.QuickFacts,
+        apiKey: String
+    ): String {
+        if (apiKey.isEmpty()) {
+            return generateFallbackNarrative(milestones, fileName, facts)
+        }
+
+        val milestonesSummary = milestones.take(5).joinToString("\n") { m ->
+            "${m.icon} ${m.type}: ${m.content} (${m.author ?: "Unknown"})"
+        }
+
+        val prompt = """
+            You are onboarding a new developer to a codebase. Create a friendly, concise narrative (2-3 sentences) about this file's history.
+            
+            File: $fileName
+            Age: ${facts.age} days
+            Total Changes: ${facts.totalCommits}
+            Contributors: ${facts.contributors}
+            
+            Key Milestones:
+            $milestonesSummary
+            
+            Write a welcoming summary that:
+            1. Explains when and why this file was created
+            2. Highlights 1-2 major changes or patterns
+            3. Mentions current state and who maintains it
+            
+            Keep it conversational and helpful for someone new to the codebase.
+        """.trimIndent()
+
+        val body = mapOf(
+            "model" to "gpt-3.5-turbo",
+            "messages" to listOf(
+                mapOf("role" to "system", "content" to "You are a helpful onboarding assistant."),
+                mapOf("role" to "user", "content" to prompt)
+            ),
+            "max_tokens" to 200,
+            "temperature" to 0.5
+        )
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $apiKey")
+            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
+            .build()
+
+        return try {
+            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            if (response.statusCode() == 200) {
+                val data = gson.fromJson(response.body(), Map::class.java)
+                val choices = data["choices"] as List<*>
+                val firstChoice = choices[0] as Map<*, *>
+                val msg = firstChoice["message"] as Map<*, *>
+                msg["content"] as String
+            } else {
+                generateFallbackNarrative(milestones, fileName, facts)
+            }
+        } catch (e: Exception) {
+            generateFallbackNarrative(milestones, fileName, facts)
+        }
+    }
+
+    /**
+     * Fallback narrative generator (no AI required)
+     */
+    fun generateFallbackNarrative(
+        milestones: List<VestigeGitAnalyzer.OnboardingMilestone>,
+        fileName: String,
+        facts: VestigeGitAnalyzer.QuickFacts
+    ): String {
+        val birthMilestone = milestones.firstOrNull { it.type == VestigeGitAnalyzer.MilestoneType.BIRTH }
+        val creator = birthMilestone?.author ?: "a developer"
+        val ageYears = facts.age / 365
+        val ageDesc = if (ageYears > 0) "$ageYears year${if (ageYears > 1) "s" else ""}" else "${facts.age} days"
+
+        var narrative = "$fileName was created $ageDesc ago by $creator. "
+
+        narrative += if (facts.totalCommits > 50) {
+            "It has evolved through ${facts.totalCommits} changes by ${facts.contributors} contributor${if (facts.contributors > 1) "s" else ""}, "
+        } else {
+            "It has seen ${facts.totalCommits} updates, "
+        }
+
+        val majorMilestones = milestones.filter { 
+            it.type in listOf(
+                VestigeGitAnalyzer.MilestoneType.REFACTOR,
+                VestigeGitAnalyzer.MilestoneType.SECURITY
+            )
+        }
+
+        narrative += if (majorMilestones.isNotEmpty()) {
+            val latest = majorMilestones.first()
+            "including ${latest.content.lowercase()}. "
+        } else {
+            "maintaining steady evolution. "
+        }
+
+        val ownershipTransition = milestones.firstOrNull { 
+            it.type == VestigeGitAnalyzer.MilestoneType.OWNERSHIP_TRANSITION 
+        }
+        
+        narrative += if (ownershipTransition != null) {
+            "${ownershipTransition.content}."
+        } else if (birthMilestone != null) {
+            "${birthMilestone.author} remains a key contributor."
+        } else {
+            "The file continues to be actively maintained."
+        }
+
+        return narrative
+    }
 }

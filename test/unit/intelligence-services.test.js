@@ -10,6 +10,10 @@ suite('IntelligenceServices Unit Test Suite', () => {
             analyzeFile: async () => ({ lines: [] }),
             calculateOwnership: () => ({ topAuthor: 'Test', percent: 100 })
         };
+
+        // Mock vscode.workspace
+        vscode.workspace.workspaceFolders = [{ uri: vscode.Uri.file('/test') }];
+        vscode.workspace.getWorkspaceFolder = () => ({ uri: vscode.Uri.file('/test') });
     });
 
     test('HandoffAssistant identifies risks', async () => {

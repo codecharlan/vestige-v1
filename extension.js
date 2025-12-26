@@ -369,6 +369,27 @@ async function analyzeCurrentFile(force = false) {
             // Elite: Narrative Biography
             analysis.narrativeBiography = gitAnalyzer.generateNarrativeBiography(analysis);
 
+            // Elite: Onboarding Tour - Generate milestones for new developers
+            analysis.onboardingTour = gitAnalyzer.generateOnboardingTour(analysis);
+
+            // Elite: Onboarding Recommendations - Expert contacts and related files
+            analysis.onboardingRecommendations = gitAnalyzer.generateOnboardingRecommendations(analysis);
+
+            // Elite: AI-Powered Onboarding Narrative
+            if (analysis.onboardingTour && analysis.onboardingTour.length > 0) {
+                try {
+                    const fileName = path.basename(filePath);
+                    analysis.onboardingNarrative = await aiService.generateOnboardingNarrative(
+                        analysis.onboardingTour,
+                        fileName,
+                        analysis.onboardingRecommendations?.facts || {}
+                    );
+                } catch (error) {
+                    console.error('Failed to generate onboarding narrative:', error);
+                    // Fallback will be used in AI service
+                }
+            }
+
             // Elite: Ghost Shadows (Recent Deletions)
             analysis.deletedChunks = await gitAnalyzer.findRecentDeletions(workspaceFolder.uri.fsPath, filePath);
 

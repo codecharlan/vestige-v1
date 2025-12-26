@@ -3,6 +3,7 @@ package com.codecharlan.vestige.logic
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ide.util.PropertiesComponent
 import java.util.concurrent.ConcurrentHashMap
 
 @Service(Service.Level.PROJECT)
@@ -17,6 +18,9 @@ class VestigeService(private val project: Project) {
         val busFactor: VestigeGitAnalyzer.BusFactorInfo?,
         val debt: Double,
         val stability: Int,
+        val onboardingTour: List<VestigeGitAnalyzer.OnboardingMilestone>? = null,
+        val onboardingRecommendations: VestigeGitAnalyzer.OnboardingRecommendations? = null,
+        val onboardingNarrative: String? = null,
         val timestamp: Long = System.currentTimeMillis()
     )
 
@@ -43,7 +47,39 @@ class VestigeService(private val project: Project) {
         // Stability Score: 100 - (commits * 2), min 0
         val stability = maxOf(0, 100 - (stats.commits * 2))
         
-        val result = AnalysisResult(stats, busFactor, debt, stability)
+        // Elite: Onboarding Tour - Generate milestones for new developers
+        val onboardingTour = analyzer.generateOnboardingTour(file)
+        
+        // Elite: Onboarding Recommendations - Expert contacts and related files
+        val onboardingRecommendations = analyzer.generateOnboardingRecommendations(file)
+        
+        // Elite: AI-Powered Onboarding Narrative
+        val onboardingNarrative = if (onboardingTour.isNotEmpty()) {
+            try {
+                val aiService = project.getService(VestigeAIService::class.java)
+                val apiKey = PropertiesComponent.getInstance().getValue("vestige.openaiApiKey", "")
+                aiService.generateOnboardingNarrative(
+                    onboardingTour,
+                    file.name,
+                    onboardingRecommendations.facts,
+                    apiKey
+                )
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+        
+        val result = AnalysisResult(
+            stats, 
+            busFactor, 
+            debt, 
+            stability,
+            onboardingTour,
+            onboardingRecommendations,
+            onboardingNarrative
+        )
         analysisCache[file.path] = result
         return result
     }

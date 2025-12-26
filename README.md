@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="images/icon.png" width="160" alt="Vestige Logo">
-</p>
-
 # 🗿 Vestige - Temporal Code Intelligence
 > *Uncover the traces of your codebase through time. Certified Master Release.*
 
@@ -61,15 +57,77 @@ Discover hidden architectural patterns:
 - **Ghost Chat**: Pair program with the "Ghost" of a developer using their historical intent.
 - **Predictive ROI**: AI-driven stability impact analysis for proposed refactorings.
 - **Automatic Summaries**: Single-sentence technical summaries for complex historical diffs.
+- **Narrative Biography**: AI-generated story of a file's evolution and purpose.
+
+---
+
+## 📜 Lore System (New!)
+*Capture and preserve architectural decisions directly in your codebase.*
+
+- **Lore Decisions**: Document "why" decisions were made with structured metadata (author, date, context).
+- **Implicit Lore Extraction**: Automatically extracts architectural decisions from commit messages.
+- **Shadow Lore Detection**: Identifies undocumented tribal knowledge from code patterns.
+- **Lore Panel**: Browse, search, and manage all architectural decisions in one place.
+- **Promote to Lore**: Convert commit messages into permanent architectural records.
+- **Webhook Integration**: Share Lore insights with team via Slack/Discord.
+
+---
+
+## ⏪ Time Machine & Rewind (New!)
+*Travel through your codebase's history with precision.*
+
+- **Workspace Rewind**: Restore your entire workspace to any previous commit.
+- **File Time Travel**: View and compare any file at different points in history.
+- **Temporal Wormholes**: Jump between related historical commits instantly.
+- **Ghost Cursor Replay**: Watch code evolution with animated playback.
+- **Commit Snapshots**: One-click access to any historical state.
+
+---
+
+## 💀 Code Graveyard (New!)
+*Honor deleted code and learn from the past.*
+
+- **Deleted Files Tracker**: Browse all files that have been removed from the codebase.
+- **Obituary Generator**: AI-generated tributes for deleted code with historical context.
+- **Resurrection**: Restore deleted files with full history intact.
+- **Deletion Analytics**: Understand patterns in code removal over time.
+
+---
+
+## 🤝 Onboarding Assistant (New!)
+*Accelerate developer onboarding with AI-powered file history tours.*
+
+- **AI Narratives**: Friendly 2-3 sentence summaries of file history, perfect for new team members.
+- **8 Milestone Types**: Automatically detects Birth, Refactors, Bug Clusters, Ownership Transitions, Architecture Decisions, Epochs, Dependencies, and Security Fixes.
+- **Expert Recommendations**: Shows top 3 contributors with ownership percentages and roles (Primary Maintainer, Core Contributor).
+- **Related Files**: Displays coupled files that frequently change together with coupling scores.
+- **Interactive Tour**: Step-by-step modal walkthrough of key milestones with progress tracking and importance badges.
+- **Quick Facts**: Visual cards showing file age, total changes, contributors, and lines of code.
+- **Zero Configuration**: Automatically generates for every file analysis, with fallback narratives when AI is unavailable.
 
 ---
 
 ## 📊 Immersive Visualizations
 - **Gravity Well (3D)**: A physics-based simulation of file complexity and "gravitational" debt.
+- **Pulse Panel**: Animated architectural pulse showing repository activity as a heartbeat.
+- **Evolution Replay**: Watch your code evolve over time with animated playback.
 - **Sankey Flow**: Visualize the movement of code between modules over time.
 - **Blast Radius Analyzer**: Calculate the "impact tremor" of a file's complexity.
 - **Sunburst Ownership**: Hierarchical treemap revealing the "Kings" of the codebase.
 - **Archaeology Skill Trees**: Progress through discovery to unlock advanced features.
+- **Performance Timeline**: Track build times and performance metrics over history.
+- **Code Flow Visualization**: See how code moves through your architecture.
+
+---
+
+## 🎮 Gamification & Achievements (New!)
+*Make code archaeology fun and rewarding.*
+
+- **Achievement System**: Unlock badges like "Fossil Hunter", "Time Traveler", "Debt Destroyer".
+- **XP & Credits**: Earn Code Archaeology Credits for exploring and improving code.
+- **Leaderboards**: Compete with teammates on code quality metrics.
+- **Skill Tree**: Unlock advanced features by completing challenges.
+- **Temporal Unlocking**: Advanced features unlock as you explore more history.
 
 ---
 
@@ -77,9 +135,12 @@ Discover hidden architectural patterns:
 - **Handoff Assistant**: Identifies modules at risk of knowledge loss.
 - **Mentorship Matcher**: Recommends historical experts for any file.
 - **Debt Horizon Forecasting**: Predicts technical debt growth over 180 days.
-- **CI/CD Gatekeeper**: Prevent high-risk temporal drift in main branches.
-- **Enterprise Bridges**: JIRA ticket creation and Slack/Discord Lore sharing.
-- **Documentation Drift**: Alerts you when docs fall out of sync with evolution.
+- **Multi-Repo Dashboard**: Aggregate metrics across all workspace folders.
+- **Bus Factor Analysis**: Identify single points of failure in code ownership.
+- **Documentation Drift Detection**: Alerts when docs fall out of sync with code.
+- **Hot Potato Detection**: Find files with excessive author turnover.
+- **Zombie Code Finder**: Identify stagnant code that hasn't changed in 365+ days.
+- **Webhook Integration**: JIRA ticket creation and Slack/Discord Lore sharing.
 
 ---
 

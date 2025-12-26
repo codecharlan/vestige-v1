@@ -216,7 +216,7 @@ class EvolutionPanel {
             // but for "Visual Time Machine" we can at least highlight changes
             newLines.forEach((line, i) => {
                 const isNew = !oldLines.includes(line);
-                html += `< span class="${isNew ? 'addition' : ''}" > ${ escapeHtml(line) } \n</span > `;
+                html += '<span class="' + (isNew ? 'addition' : '') + '">' + escapeHtml(line) + '\\n</span>';
             });
 
             codeView.innerHTML = html;

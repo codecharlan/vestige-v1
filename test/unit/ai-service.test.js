@@ -10,6 +10,11 @@ suite('AIService Test Suite', () => {
         service = new AIService();
         originalGetConfiguration = vscode.workspace.getConfiguration;
 
+        // Default mock for configuration
+        vscode.workspace.getConfiguration = (section) => ({
+            get: (key) => 'test-key'
+        });
+
         // Mock global fetch
         global.fetch = async (url, options) => {
             return {

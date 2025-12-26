@@ -323,13 +323,114 @@ class TimelinePanel {
     ` : ''}
 
     ${analysis.onboardingTour && analysis.onboardingTour.length > 0 ? `
-        <div class="section-header">🤝 Onboarding Buddy</div>
-        <div class="bio-box" style="display: flex; justify-content: space-between; align-items: center; border-left-color: #69f0ae; background: rgba(105, 240, 174, 0.03);">
-            <div>
-                <strong>New hire?</strong> Start a guided tour of this file's evolution.
-                <div style="font-size: 0.8em; margin-top: 5px;">${analysis.onboardingTour.length} milestones found.</div>
+        <div class="section-header">🤝 Onboarding Assistant</div>
+        
+        <!-- AI-Generated Narrative -->
+        ${analysis.onboardingNarrative ? `
+            <div class="onboarding-narrative" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(59, 130, 246, 0.05)); border-left: 4px solid #10B981; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                <div style="font-size: 0.85em; color: #10B981; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <span>✨</span> WELCOME TO ${fileName.toUpperCase()}
+                </div>
+                <p style="font-size: 1em; line-height: 1.6; color: #E2E8F0; margin: 0;">${analysis.onboardingNarrative}</p>
             </div>
-            <button onclick="startTour()">Start Tour</button>
+        ` : ''}
+
+        <!-- Quick Facts Grid -->
+        ${analysis.onboardingRecommendations?.facts ? `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                <div class="stat-card" style="text-align: center; padding: 12px;">
+                    <div style="font-size: 1.5em; font-weight: 700; color: #60A5FA;">📅</div>
+                    <div style="font-size: 0.9em; color: #94A3B8; margin-top: 4px;">${Math.floor(analysis.onboardingRecommendations.facts.age / 365)}y ${analysis.onboardingRecommendations.facts.age % 365}d</div>
+                    <div style="font-size: 0.7em; color: #64748B;">Age</div>
+                </div>
+                <div class="stat-card" style="text-align: center; padding: 12px;">
+                    <div style="font-size: 1.5em; font-weight: 700; color: #F472B6;">🔄</div>
+                    <div style="font-size: 0.9em; color: #94A3B8; margin-top: 4px;">${analysis.onboardingRecommendations.facts.totalCommits}</div>
+                    <div style="font-size: 0.7em; color: #64748B;">Changes</div>
+                </div>
+                <div class="stat-card" style="text-align: center; padding: 12px;">
+                    <div style="font-size: 1.5em; font-weight: 700; color: #FBBF24;">👥</div>
+                    <div style="font-size: 0.9em; color: #94A3B8; margin-top: 4px;">${analysis.onboardingRecommendations.facts.contributors}</div>
+                    <div style="font-size: 0.7em; color: #64748B;">Contributors</div>
+                </div>
+                <div class="stat-card" style="text-align: center; padding: 12px;">
+                    <div style="font-size: 1.5em; font-weight: 700; color: #A78BFA;">📏</div>
+                    <div style="font-size: 0.9em; color: #94A3B8; margin-top: 4px;">${analysis.onboardingRecommendations.facts.complexity}</div>
+                    <div style="font-size: 0.7em; color: #64748B;">Lines</div>
+                </div>
+            </div>
+        ` : ''}
+
+        <!-- Expert Recommendations -->
+        ${analysis.onboardingRecommendations?.experts && analysis.onboardingRecommendations.experts.length > 0 ? `
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 0.85em; font-weight: 600; color: #94A3B8; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <span>💡</span> ASK THESE EXPERTS
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                    ${analysis.onboardingRecommendations.experts.map(expert => `
+                        <div class="expert-card" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px;">
+                            <div style="font-weight: 600; color: #60A5FA; font-size: 0.9em; margin-bottom: 4px;">👤 ${expert.name}</div>
+                            <div style="font-size: 0.75em; color: #94A3B8; margin-bottom: 6px;">${expert.role}</div>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <div style="flex: 1; height: 4px; background: rgba(96, 165, 250, 0.2); border-radius: 2px; overflow: hidden;">
+                                    <div style="height: 100%; width: ${expert.ownership}%; background: #60A5FA;"></div>
+                                </div>
+                                <span style="font-size: 0.7em; color: #60A5FA; font-weight: 600;">${expert.ownership}%</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        ` : ''}
+
+        <!-- Related Files -->
+        ${analysis.onboardingRecommendations?.relatedFiles && analysis.onboardingRecommendations.relatedFiles.length > 0 ? `
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 0.85em; font-weight: 600; color: #94A3B8; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <span>🔗</span> RELATED FILES
+                </div>
+                <div style="background: rgba(244, 114, 182, 0.05); border: 1px solid rgba(244, 114, 182, 0.2); border-radius: 8px; padding: 12px;">
+                    ${analysis.onboardingRecommendations.relatedFiles.map(file => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(244, 114, 182, 0.1); last-child:border-bottom: none;">
+                            <div>
+                                <div style="font-size: 0.85em; color: #F472B6; font-weight: 500;">${file.file}</div>
+                                <div style="font-size: 0.7em; color: #94A3B8;">${file.reason}</div>
+                            </div>
+                            <div style="font-size: 0.75em; color: #F472B6; font-weight: 600;">${file.coupling}/10</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        ` : ''}
+
+        <!-- Milestone Timeline -->
+        <div style="margin-bottom: 20px;">
+            <div style="font-size: 0.85em; font-weight: 600; color: #94A3B8; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                <span>📍</span> KEY MILESTONES (${analysis.onboardingTour.length})
+            </div>
+            <div class="milestone-timeline" style="position: relative; padding-left: 30px;">
+                <div style="position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, #60A5FA, transparent);"></div>
+                ${analysis.onboardingTour.map((milestone, index) => `
+                    <div class="milestone-item" style="position: relative; margin-bottom: 16px; padding: 12px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border-left: 3px solid ${milestone.importance > 8 ? '#EF4444' : milestone.importance > 6 ? '#F59E0B' : '#60A5FA'};">
+                        <div style="position: absolute; left: -23px; top: 16px; width: 12px; height: 12px; border-radius: 50%; background: ${milestone.importance > 8 ? '#EF4444' : milestone.importance > 6 ? '#F59E0B' : '#60A5FA'}; box-shadow: 0 0 10px currentColor;"></div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span style="font-size: 1.2em;">${milestone.icon}</span>
+                            <span style="font-size: 0.75em; color: #94A3B8; text-transform: uppercase; font-weight: 600;">${milestone.type}</span>
+                            ${milestone.date ? `<span style="font-size: 0.7em; color: #64748B;">${new Date(milestone.date).toLocaleDateString()}</span>` : ''}
+                        </div>
+                        <div style="font-size: 0.9em; color: #E2E8F0; margin-bottom: 4px;">${milestone.content}</div>
+                        ${milestone.author ? `<div style="font-size: 0.75em; color: #94A3B8;">by ${milestone.author}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- Interactive Tour Button -->
+        <div style="text-align: center; margin-top: 20px;">
+            <button onclick="startInteractiveTour()" style="background: linear-gradient(135deg, #10B981, #3B82F6); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 0.9em; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                🎬 Start Interactive Tour
+            </button>
         </div>
     ` : ''}
 
@@ -400,6 +501,197 @@ class TimelinePanel {
             document.getElementById('refactor-content').innerText = "Calculating high-ROI refactor patterns...";
             vscode.postMessage({ command: 'getRefactorIdeas' });
         }
+        
+        // Interactive Tour System
+        let tourState = {
+            milestones: ${JSON.stringify(analysis.onboardingTour || [])},
+            currentStep: 0,
+            isActive: false
+        };
+
+        function startInteractiveTour() {
+            if (tourState.milestones.length === 0) return;
+            
+            tourState.isActive = true;
+            tourState.currentStep = 0;
+            showTourModal();
+        }
+
+        function showTourModal() {
+            const milestone = tourState.milestones[tourState.currentStep];
+            const progress = ((tourState.currentStep + 1) / tourState.milestones.length) * 100;
+            
+            // Remove existing modal
+            const existing = document.getElementById('tour-modal');
+            if (existing) existing.remove();
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.id = 'tour-modal';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 10000; animation: fadeIn 0.3s ease;';
+            
+            modal.innerHTML = '<div style="' +
+                'background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));' +
+                'border: 1px solid rgba(96, 165, 250, 0.3);' +
+                'border-radius: 16px;' +
+                'padding: 32px;' +
+                'max-width: 600px;' +
+                'width: 90%;' +
+                'box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);' +
+                'position: relative;' +
+            '">' +
+                '<!-- Progress Bar -->' +
+                '<div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: rgba(96, 165, 250, 0.2); border-radius: 16px 16px 0 0; overflow: hidden;">' +
+                    '<div style="height: 100%; width: ' + progress + '%; background: linear-gradient(90deg, #10B981, #60A5FA); transition: width 0.3s ease;"></div>' +
+                '</div>' +
+                
+                '<!-- Step Counter -->' +
+                '<div style="text-align: center; margin-bottom: 20px;">' +
+                    '<span style="font-size: 0.85em; color: #94A3B8; font-weight: 600;">' +
+                        'MILESTONE ' + (tourState.currentStep + 1) + ' OF ' + tourState.milestones.length +
+                    '</span>' +
+                '</div>' +
+                
+                '<!-- Milestone Icon & Type -->' +
+                '<div style="text-align: center; margin-bottom: 16px;">' +
+                    '<div style="font-size: 3em; margin-bottom: 8px;">' + milestone.icon + '</div>' +
+                    '<div style="font-size: 0.9em; color: #60A5FA; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">' +
+                        milestone.type +
+                    '</div>' +
+                '</div>' +
+                
+                '<!-- Content -->' +
+                '<div style="text-align: center; margin-bottom: 20px;">' +
+                    '<p style="font-size: 1.1em; color: #E2E8F0; line-height: 1.6; margin: 0 0 12px 0;">' +
+                        milestone.content +
+                    '</p>' +
+                    (milestone.author ? '<div style="font-size: 0.85em; color: #94A3B8;">by <strong>' + milestone.author + '</strong></div>' : '') +
+                    (milestone.date ? '<div style="font-size: 0.75em; color: #64748B; margin-top: 4px;">' + new Date(milestone.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + '</div>' : '') +
+                '</div>' +
+                
+                '<!-- Importance Badge -->' +
+                '<div style="text-align: center; margin-bottom: 24px;">' +
+                    '<span style="' +
+                        'display: inline-block;' +
+                        'padding: 4px 12px;' +
+                        'border-radius: 12px;' +
+                        'font-size: 0.75em;' +
+                        'font-weight: 600;' +
+                        'background: ' + (milestone.importance > 8 ? 'rgba(239, 68, 68, 0.2)' : milestone.importance > 6 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(96, 165, 250, 0.2)') + ';' +
+                        'color: ' + (milestone.importance > 8 ? '#EF4444' : milestone.importance > 6 ? '#F59E0B' : '#60A5FA') + ';' +
+                        'border: 1px solid ' + (milestone.importance > 8 ? 'rgba(239, 68, 68, 0.4)' : milestone.importance > 6 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(96, 165, 250, 0.4)') + ';' +
+                    '">' +
+                        (milestone.importance > 8 ? '🔥 CRITICAL' : milestone.importance > 6 ? '⚠️ IMPORTANT' : '📌 NOTABLE') +
+                    '</span>' +
+                '</div>' +
+                
+                '<!-- Navigation -->' +
+                '<div style="display: flex; gap: 12px; justify-content: center;">' +
+                    (tourState.currentStep > 0 ? 
+                        '<button onclick="previousStep()" style="' +
+                            'flex: 1;' +
+                            'background: rgba(255, 255, 255, 0.05);' +
+                            'border: 1px solid rgba(255, 255, 255, 0.1);' +
+                            'color: #E2E8F0;' +
+                            'padding: 10px 20px;' +
+                            'border-radius: 8px;' +
+                            'font-weight: 600;' +
+                            'cursor: pointer;' +
+                            'transition: all 0.2s;' +
+                        '" onmouseover="this.style.background=\'rgba(255, 255, 255, 0.1)\'" onmouseout="this.style.background=\'rgba(255, 255, 255, 0.05)\'">' +
+                            '← Previous' +
+                        '</button>'
+                    : '') +
+                    
+                    (tourState.currentStep < tourState.milestones.length - 1 ? 
+                        '<button onclick="nextStep()" style="' +
+                            'flex: 1;' +
+                            'background: linear-gradient(135deg, #10B981, #3B82F6);' +
+                            'border: none;' +
+                            'color: white;' +
+                            'padding: 10px 20px;' +
+                            'border-radius: 8px;' +
+                            'font-weight: 600;' +
+                            'cursor: pointer;' +
+                            'box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);' +
+                            'transition: all 0.2s;' +
+                        '" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'translateY(0)\'">' +
+                            'Next →' +
+                        '</button>'
+                    : 
+                        '<button onclick="finishTour()" style="' +
+                            'flex: 1;' +
+                            'background: linear-gradient(135deg, #10B981, #059669);' +
+                            'border: none;' +
+                            'color: white;' +
+                            'padding: 10px 20px;' +
+                            'border-radius: 8px;' +
+                            'font-weight: 600;' +
+                            'cursor: pointer;' +
+                            'box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);' +
+                        '">' +
+                            '🎉 Finish Tour' +
+                        '</button>'
+                    ) +
+                    
+                    '<button onclick="closeTour()" style="' +
+                        'background: transparent;' +
+                        'border: 1px solid rgba(239, 68, 68, 0.3);' +
+                        'color: #EF4444;' +
+                        'padding: 10px 20px;' +
+                        'border-radius: 8px;' +
+                        'font-weight: 600;' +
+                        'cursor: pointer;' +
+                    '">' +
+                        '✕' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+            
+            document.body.appendChild(modal);
+        }
+
+        function nextStep() {
+            if (tourState.currentStep < tourState.milestones.length - 1) {
+                tourState.currentStep++;
+                showTourModal();
+            }
+        }
+
+        function previousStep() {
+            if (tourState.currentStep > 0) {
+                tourState.currentStep--;
+                showTourModal();
+            }
+        }
+
+        function finishTour() {
+            closeTour();
+            vscode.postMessage({ command: 'tourCompleted', milestones: tourState.milestones.length });
+        }
+
+        function closeTour() {
+            const modal = document.getElementById('tour-modal');
+            if (modal) {
+                modal.style.animation = 'fadeOut 0.3s ease';
+                setTimeout(() => modal.remove(), 300);
+            }
+            tourState.isActive = false;
+        }
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = \`
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes fadeOut {
+                from { opacity: 1; }
+                to { opacity: 0; }
+            }
+        \`;
+        document.head.appendChild(style);
         
         window.addEventListener('message', event => {
             const message = event.data;

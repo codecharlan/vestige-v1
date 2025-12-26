@@ -51,6 +51,11 @@ class VestigeToolWindowFactory : ToolWindowFactory {
         val skillContent = contentFactory.createContent(skillPanel, "Skill Tree", false)
         toolWindow.contentManager.addContent(skillContent)
 
+        // Onboarding Tab
+        val onboardingPanel = VestigeOnboardingPanel(project)
+        val onboardingContent = contentFactory.createContent(onboardingPanel, "Onboarding", false)
+        toolWindow.contentManager.addContent(onboardingContent)
+
         // Evolution Preview Tab
         val replayPanel = VestigeEvolutionReplay()
         val replayContent = contentFactory.createContent(replayPanel, "Evolution", false)

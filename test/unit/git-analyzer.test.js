@@ -50,7 +50,7 @@ suite('GitAnalyzer Unit Test Suite', () => {
             }
         };
 
-        const result = await analyzer.analyzeFile('/repo', 'test.js', false, mockContext);
+        const result = await analyzer.analyzeFile('.', 'test.js', false, mockContext);
         assert.strictEqual(result.stability, 100);
     });
 });

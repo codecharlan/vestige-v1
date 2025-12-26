@@ -1,8 +1,8 @@
 {
     "name": "vestige",
     "displayName": "Vestige - Temporal Code Intelligence",
-    "description": "Uncover the traces of your codebase through time. Inline temporal linting that reveals code age, churn, and evolution.",
-    "version": "1.0.4",
+    "description": "Uncover the traces of your codebase through time. AI-powered onboarding, inline temporal linting, and interactive file history tours.",
+    "version": "1.0.5",
     "publisher": "codecharlan",
     "repository": {
         "type": "git",
@@ -22,7 +22,10 @@
         "temporal",
         "history",
         "code age",
-        "archaeology"
+        "archaeology",
+        "onboarding",
+        "AI",
+        "developer experience"
     ],
     "activationEvents": [
         "onStartupFinished"
@@ -117,6 +120,66 @@
             {
                 "command": "vestige.addDecision",
                 "title": "Vestige: Add Lore Decision ➕"
+            },
+            {
+                "command": "vestige.promoteLore",
+                "title": "Vestige: Promote to Lore 📜"
+            },
+            {
+                "command": "vestige.chatWithGhost",
+                "title": "Vestige: Chat with Ghost Developer 👻"
+            },
+            {
+                "command": "vestige.explainCommit",
+                "title": "Vestige: AI Explain Commit 🤖"
+            },
+            {
+                "command": "vestige.openFileAtCommit",
+                "title": "Vestige: Open File at Commit 🕰️"
+            },
+            {
+                "command": "vestige.viewDeletedFile",
+                "title": "Vestige: View Deleted File 💀"
+            },
+            {
+                "command": "vestige.resurrectFile",
+                "title": "Vestige: Resurrect Deleted File ♻️"
+            },
+            {
+                "command": "vestige.runTimeMachine",
+                "title": "Vestige: Run Time Machine 🌀"
+            },
+            {
+                "command": "vestige.showGravityWell",
+                "title": "Vestige: Show Gravity Well 🌌"
+            },
+            {
+                "command": "vestige.replayGhost",
+                "title": "Vestige: Replay Ghost Cursor 👻"
+            },
+            {
+                "command": "vestige.showPulse",
+                "title": "Vestige: Show Architectural Pulse 💓"
+            },
+            {
+                "command": "vestige.openWormhole",
+                "title": "Vestige: Open Temporal Wormhole 🕳️"
+            },
+            {
+                "command": "vestige.showSkillTree",
+                "title": "Vestige: Show Skill Tree 🌳"
+            },
+            {
+                "command": "vestige.askArchaeologist",
+                "title": "Vestige: Ask AI Archaeologist 🔍"
+            },
+            {
+                "command": "vestige.getRefactorIdeas",
+                "title": "Vestige: Get Refactor Ideas 💡"
+            },
+            {
+                "command": "vestige.shareLore",
+                "title": "Vestige: Share Lore to Webhook 📤"
             }
         ],
         "configuration": {
