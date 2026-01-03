@@ -1,9 +1,13 @@
 package com.codecharlan.vestige.logic
 
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import git4idea.repo.GitRepositoryManager
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.*
 
 @Service(Service.Level.PROJECT)
 class VestigeHandoffAssistant(private val project: Project) {
@@ -16,23 +20,44 @@ class VestigeHandoffAssistant(private val project: Project) {
     )
 
     fun identifyRisks(): List<OrphanageRisk> {
-        val analyzer = project.getService(VestigeGitAnalyzer::class.java)
-        val roots = GitRepositoryManager.getInstance(project).repositories
+        val analyzer = project.service<VestigeGitAnalyzer>()
         val risks = mutableListOf<OrphanageRisk>()
-
-        roots.forEach { repo ->
-            // In a real impl, we'd scan all files. For simulation, pick key files.
-            val files = repo.root.children.filter { !it.name.startsWith(".") }.take(10)
-            files.forEach { file ->
-                val busInfo = analyzer.calculateBusFactor(file)
-                val stats = analyzer.getFileStats(file) ?: return@forEach
-                
-                // Risk if top author owns > 70% and hasn't committed in > 6 months
-                val score = if (stats.ownershipPercent > 70 && stats.ageDays > 180) 100 else 40
-                val status = if (score > 80) "Orphaned" else "Safe"
-                
-                risks.add(OrphanageRisk(file.name, stats.topAuthor, status, score))
+        
+        // Get all files in the project (simplified - in real implementation, you'd want to filter this)
+        // Get all files in the project
+        val baseDir = project.basePath?.let { com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(it) }
+        val files = baseDir?.children?.filter { 
+            !it.name.startsWith(".") && !it.isDirectory 
+        }?.take(10) ?: return emptyList()
+        
+        files.forEach { file ->
+            val stats = analyzer.analyzeFile(file) ?: return@forEach
+            
+            // Calculate risk based on ownership and last modified date
+            val lastModified = stats.lastModifiedDate.toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+            val monthsSinceLastUpdate = ChronoUnit.MONTHS.between(
+                lastModified,
+                LocalDate.now()
+            )
+            
+            // Risk if top author owns > 70% and hasn't committed in > 6 months
+            val isHighRisk = stats.ownershipPercent > 70 && monthsSinceLastUpdate > 6
+            
+            val status = when {
+                isHighRisk -> "Orphaned"
+                stats.ownershipPercent > 50 -> "At Risk"
+                else -> "Active"
             }
+            
+            risks.add(OrphanageRisk(
+                file = file.path,
+                topAuthor = stats.topAuthor,
+                status = status,
+                riskScore = (stats.ownershipPercent * 0.7 + 
+                           if (isHighRisk) 30 else 0).toInt()
+            ))
         }
         return risks.sortedByDescending { it.riskScore }
     }

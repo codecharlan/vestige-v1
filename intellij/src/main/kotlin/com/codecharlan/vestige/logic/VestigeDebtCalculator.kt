@@ -1,12 +1,15 @@
 package com.codecharlan.vestige.logic
 
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import kotlin.math.ln
 import kotlin.math.max
 
 @Service(Service.Level.PROJECT)
-class VestigeDebtCalculator(private val gitAnalyzer: VestigeGitAnalyzer) {
+class VestigeDebtCalculator(private val project: Project) {
+
+    private val gitAnalyzer: VestigeGitAnalyzer by lazy { project.getService(VestigeGitAnalyzer::class.java) }
 
     data class DebtForecast(
         val score: Double,

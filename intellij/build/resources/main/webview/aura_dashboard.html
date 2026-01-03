@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vestige Aura</title>
+    <style>
+        :root {
+            --bg-deep: #0F172A;
+            --glass-bg: rgba(30, 41, 59, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary-glow: #10B981;
+            --secondary-glow: #3B82F6;
+            --accent-glow: #F59E0B;
+            --text-main: #F8FAFC;
+            --text-dim: #94A3B8;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            margin: 0;
+            padding: 24px;
+            overflow-x: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #10B981, #3B82F6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 6px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            color: var(--primary-glow);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-glow);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary-glow);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.5);
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(12px);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .stats-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+        }
+
+        .sentinel-section {
+            margin-top: auto;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1));
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .sentinel-avatar {
+            font-size: 2rem;
+            background: var(--glass-bg);
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+        }
+
+        .sentinel-text {
+            flex: 1;
+        }
+
+        .sentinel-bubble {
+            font-size: 0.9rem;
+            font-style: italic;
+            color: var(--text-main);
+        }
+
+        .shimmer-text {
+            background: linear-gradient(90deg, #94A3B8, #F8FAFC, #94A3B8);
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s infinite linear;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="title">VESTIGE AURA</div>
+        <div class="status-badge">
+            <div class="status-dot"></div>
+            Zenith Active
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">Temporal Churn</div>
+            <div class="card-value" id="churn-val">12.4%</div>
+            <p style="font-size: 0.75rem; color: #10B981; margin-top: 4px;">↓ 2.1% from last week</p>
+        </div>
+        <div class="card">
+            <div class="card-title">Code Fossils</div>
+            <div class="card-value" id="fossil-val">42</div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Ancient files detected</p>
+        </div>
+    </div>
+
+    <div class="card" style="flex: 1;">
+        <div class="card-title">Project Pulse</div>
+        <div style="height: 100px; display: flex; align-items: flex-end; gap: 4px; margin-top: 20px;">
+            <div style="flex: 1; height: 40%; background: #10B981; border-radius: 4px 4px 0 0; opacity: 0.3;"></div>
+            <div style="flex: 1; height: 60%; background: #10B981; border-radius: 4px 4px 0 0; opacity: 0.5;"></div>
+            <div style="flex: 1; height: 85%; background: #10B981; border-radius: 4px 4px 0 0; opacity: 0.8;"></div>
+            <div style="flex: 1; height: 50%; background: #3B82F6; border-radius: 4px 4px 0 0; opacity: 0.6;"></div>
+            <div style="flex: 1; height: 95%; background: #3B82F6; border-radius: 4px 4px 0 0;"></div>
+            <div style="flex: 1; height: 30%; background: #F59E0B; border-radius: 4px 4px 0 0; opacity: 0.4;"></div>
+        </div>
+        <ul class="stats-list" style="margin-top: 24px;">
+            <li class="stat-item">
+                <span class="stat-label">Stability Index</span>
+                <span style="color: #10B981;">94/100</span>
+            </li>
+            <li class="stat-item">
+                <span class="stat-label">Bus Factor</span>
+                <span style="color: #F59E0B;">3</span>
+            </li>
+            <li class="stat-item">
+                <span class="stat-label">Lore Capture Rate</span>
+                <span>82%</span>
+            </li>
+        </ul>
+    </div>
+
+    <div class="sentinel-section">
+        <div class="sentinel-avatar" id="pet-avatar">🦉</div>
+        <div class="sentinel-text">
+            <div class="card-title" style="margin-bottom: 4px;">Sentient Insight</div>
+            <div class="sentinel-bubble shimmer-text" id="insight-text">"The history of this project is a tapestry of
+                bold decisions and cautious refactors."</div>
+        </div>
+    </div>
+
+    <script>
+        function updateStats(data) {
+            if (data.churn) document.getElementById('churn-val').innerText = data.churn;
+            if (data.fossils) document.getElementById('fossil-val').innerText = data.fossils;
+            if (data.insight) document.getElementById('insight-text').innerText = data.insight;
+            if (data.pet) document.getElementById('pet-avatar').innerText = data.pet;
+        }
+
+        // Simulate initial loading
+        setTimeout(() => {
+            updateStats({
+                insight: "I've detected a significant ownership transition in the core logic."
+            });
+        }, 3000);
+    </script>
+</body>
+
+</html>

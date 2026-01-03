@@ -10,7 +10,7 @@ class VestigeAchievementService(private val project: Project) {
 
     enum class Achievement(
         val id: String,
-        val name: String,
+        val displayName: String,
         val description: String,
         val requirement: Int
     ) {
@@ -46,7 +46,7 @@ class VestigeAchievementService(private val project: Project) {
             if (achievement.id == id && count >= achievement.requirement && !unlocked.contains(achievement.id)) {
                 unlocked.add(achievement.id)
                 properties.setList("vestige.unlocked", unlocked)
-                Messages.showInfoMessage(project, "🎉 Achievement Unlocked: ${achievement.name}", "Vestige")
+                Messages.showInfoMessage(project, "🎉 Achievement Unlocked: ${achievement.displayName}", "Vestige")
             }
         }
     }

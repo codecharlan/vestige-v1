@@ -1,23 +1,31 @@
 package com.codecharlan.vestige.ui
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTabbedPane
+import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
-import javax.swing.BoxLayout
+import com.intellij.util.ui.JBUI
+import java.awt.BorderLayout
 import javax.swing.JPanel
+import javax.swing.JScrollPane
 
 class VestigeToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val contentFactory = ContentFactory.getInstance()
 
-        // Timeline Tab
-        val timelinePanel = JPanel()
-        timelinePanel.layout = BoxLayout(timelinePanel, BoxLayout.Y_AXIS)
-        timelinePanel.add(VestigePulsePanel())
-        timelinePanel.add(VestigeUI.ZenithPanel().apply {
-            add(VestigeStatusDashboard(project))
-        })
+        // Aura Dashboard (New Zenith Experience)
+        val auraPanel = VestigeAuraPanel(project)
+        val auraContent = contentFactory.createContent(auraPanel, "Aura", false)
+        toolWindow.contentManager.addContent(auraContent, 0)
+
+        // Timeline Tab (Dashboard)
+        val timelinePanel = JPanel(BorderLayout())
+        timelinePanel.add(VestigeStatusDashboard(project), BorderLayout.CENTER)
+        
         val timelineContent = contentFactory.createContent(timelinePanel, "Timeline", false)
         toolWindow.contentManager.addContent(timelineContent)
 
@@ -31,6 +39,7 @@ class VestigeToolWindowFactory : ToolWindowFactory {
         val leaderboardContent = contentFactory.createContent(leaderboardPanel, "Leaderboard", false)
         toolWindow.contentManager.addContent(leaderboardContent)
 
+        /* Performance and Flow panels not implemented yet
         // Performance Tab
         val performancePanel = PerformancePanel(project)
         val performanceContent = contentFactory.createContent(performancePanel, "Performance", false)
@@ -40,6 +49,7 @@ class VestigeToolWindowFactory : ToolWindowFactory {
         val flowPanel = FlowPanel(project)
         val flowContent = contentFactory.createContent(flowPanel, "Flow", false)
         toolWindow.contentManager.addContent(flowContent)
+        */
 
         // Gravity Well Tab
         val wellPanel = VestigeGravityWellPanel()
@@ -60,5 +70,15 @@ class VestigeToolWindowFactory : ToolWindowFactory {
         val replayPanel = VestigeEvolutionReplay()
         val replayContent = contentFactory.createContent(replayPanel, "Evolution", false)
         toolWindow.contentManager.addContent(replayContent)
+        
+        // Health Score Dashboard Tab
+        val healthPanel = VestigeHealthDashboardPanel(project)
+        val healthContent = contentFactory.createContent(healthPanel, "Health Score", false)
+        toolWindow.contentManager.addContent(healthContent)
+        
+        // Evolution Graph Tab
+        val evolutionGraphPanel = VestigeEvolutionGraphPanel(project)
+        val evolutionGraphContent = contentFactory.createContent(evolutionGraphPanel, "Evolution Graph", false)
+        toolWindow.contentManager.addContent(evolutionGraphContent)
     }
 }

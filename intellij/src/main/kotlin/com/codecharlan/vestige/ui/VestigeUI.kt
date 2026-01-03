@@ -101,3 +101,8 @@ object VestigeUI {
         return JLayer(component, GlassLayerUI())
     }
 }
+
+// Extension function for Color with alpha
+fun Color.withAlpha(alpha: Int): Color {
+    return Color(this.red, this.green, this.blue, alpha.coerceIn(0, 255))
+}

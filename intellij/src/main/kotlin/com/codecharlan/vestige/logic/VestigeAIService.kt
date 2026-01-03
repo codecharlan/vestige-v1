@@ -7,7 +7,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import com.google.gson.Gson
 
-@Service(Service.Level.APPLICATION)
+@Service
 class VestigeAIService {
     private val client = HttpClient.newBuilder().build()
     private val gson = Gson()
@@ -150,13 +150,24 @@ class VestigeAIService {
 
     fun summarizeDiff(diff: String, apiKey: String): String {
         if (apiKey.isEmpty()) return "AI summary unavailable."
-        val prompt = "Summarize this technical diff in 1 sentence for a project lead:\n\n${diff.take(2000)}"
+        val prompt = """
+            Analyze this technical diff. Provide a high-density, single-sentence summary for a Lead Architect.
+            Focus on intent and structural impact, not just line changes.
+            
+            Diff:
+            ${diff.take(2000)}
+        """.trimIndent()
         return callAI(prompt, apiKey, 100)
     }
 
     fun predictStabilityImpact(filePath: String, change: String, apiKey: String): String {
         if (apiKey.isEmpty()) return "AI prediction unavailable."
-        val prompt = "Predict the stability impact (ROI) of this refactoring in $filePath: $change"
+        val prompt = """
+            Perform a stability impact analysis for this change in '$filePath'.
+            Change summary: $change
+            
+            Predict potential regressions or architectural friction in 2 sentences.
+        """.trimIndent()
         return callAI(prompt, apiKey, 200)
     }
 

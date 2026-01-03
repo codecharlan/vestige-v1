@@ -1,0 +1,108 @@
+<idea-plugin>
+  <version>1.0.6.1</version>
+  <idea-version since-build="232" until-build="252.*" />
+  <id>com.codecharlan.vestige</id>
+  <name>Vestige - Temporal Code Intelligence</name>
+  <vendor email="support@codecharlan.com" url="https://github.com/codecharlan/vestige-v1">codecharlan</vendor>
+  <description><![CDATA[Vestige brings <b>temporal awareness</b> directly into your code editor. See which code is ancient, which is churning, and which just changed—all without leaving your file.<br><br>
+
+    <b>🗿 Vestige - Temporal Code Intelligence</b><br>
+    <i>Uncover the traces of your codebase through time. Certified Master Release.</i><br><br>
+
+    <b>🏛️ Core Features:</b>
+    <ul>
+        <li><b>🗺️ Heatmap Explorer:</b> Files are automatically color-coded based on git history (🔥 High Churn, 🗿 Fossils, ✨ Recent).</li>
+        <li><b>✍️ Inline Temporal Annotations:</b> Tactile editor decorations that reveal history as you code.</li>
+        <li><b>🕰️ Time Travel (Timeline Panel):</b> Complete commit history in a beautiful, lazy-loaded timeline.</li>
+        <li><b>🧠 Code Archaeologist (AI):</b> Hypothesizes why legacy code persists (Load-Bearing Wall, Sunken Treasure, or Zombie).</li>
+        <li><b>📜 Lore System:</b> Capture and preserve architectural decisions directly in your codebase.</li>
+        <li><b>🤝 Onboarding Assistant:</b> AI-powered file history tours for new developers.</li>
+        <li><b>💀 Code Graveyard:</b> Honor deleted code and learn from the past.</li>
+    </ul>
+
+    Experience Zenith Elite Aesthetics with kinetic typography, glassmorphism, and bioluminescent UI indicators.]]></description>
+  <category>Code tools</category>
+  <change-notes><![CDATA[<b>Version 1.0.6.1 (Zenith Release)</b>
+    <ul>
+        <li>✨ <b>Zenith Upgrade:</b> Re-engineered the core analysis engine for asynchronous, multi-threaded performance. No more UI lag!</li>
+        <li>🎨 <b>Aura Panel:</b> Introduced a premium JCEF-powered dashboard with glassmorphic aesthetics and real-time health metrics.</li>
+        <li>🕰️ <b>Shadow History:</b> New local snapshot system with disk serialization to manage memory while preserving every local edit.</li>
+        <li>🗺️ <b>Recursive Heatmaps:</b> Folder-level heatmap aggregation for high-level repository hotspots.</li>
+        <li>👻 <b>Ghost Overlay:</b> Improved editor HUDs with predictive architectural intent and presence detection.</li>
+        <li>🛠️ <b>SDK Polish:</b> Full compatibility with IntelliJ 2023.2 and resolved all previous build warnings.</li>
+    </ul>
+    <b>Version 1.0.6</b>
+    <ul>
+        <li>🚀 <b>Marketplace:</b> Optimized plugin icon (SVG) and expanded feature descriptions.</li>
+        <li>🛠️ <b>Reliability:</b> Fixed <code>InstantiationException</code> in Debt Calculator service.</li>
+        <li>🎨 <b>UI:</b> Improved Project View decorations (badges append to file names).</li>
+    </ul>
+    <b>Version 1.0.5</b>
+    <ul>
+        <li>🚀 <b>Performance:</b> Preliminary optimizations for local analysis.</li>
+    </ul>
+    <b>Version 1.0.4</b>
+    <ul>
+        <li>🧠 Added Centurion Intelligence (AI-powered historical intent).</li>
+        <li>📜 Introduced the Lore System for architectural decision tracking.</li>
+    </ul>]]></change-notes>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>Git4Idea</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="Vestige" secondary="true" icon="/META-INF/pluginIcon.svg" anchor="right" factoryClass="com.codecharlan.vestige.ui.VestigeToolWindowFactory" />
+    <statusBarWidgetFactory implementation="com.codecharlan.vestige.ui.VestigeStatusBarWidgetFactory" id="VestigeStatusBar" />
+    <notificationGroup id="VestigeNotifications" displayType="BALLOON" />
+    <editorLineMarkerProvider language="ANY" implementationClass="com.codecharlan.vestige.ui.VestigeLineMarkerProvider" />
+    <applicationService serviceImplementation="com.codecharlan.vestige.logic.VestigeAIService" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeGitAnalyzer" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeDebtCalculator" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeAchievementService" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeService" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeRewindService" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeLoreService" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeSmartNotifications" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.SentientLoreGenerator" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeSimilarityRadar" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigePredictiveRefactoring" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeSmartNavigation" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeAutoDocumentation" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeHealthScore" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeDependencyImpact" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigePatternDetector" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeCipherPet" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeEchoChamber" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeGhostCursor" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeWormholeService" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeButterflyEffectAnalyzer" />
+    <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeLoreBridge" />
+    <projectConfigurable parentId="tools" instance="com.codecharlan.vestige.ui.VestigeSettingsConfigurable" id="com.codecharlan.vestige.settings" displayName="Vestige" />
+    <projectViewNodeDecorator implementation="com.codecharlan.vestige.ui.VestigeFileDecorator" />
+    <projectListeners>
+      <listener class="com.codecharlan.vestige.logic.VestigeFileListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener" />
+      <listener class="com.codecharlan.vestige.logic.VestigeEditorListener" topic="com.intellij.openapi.fileEditor.FileEditorManagerListener" />
+    </projectListeners>
+  </extensions>
+  <actions>
+    <group id="VestigeActionGroup" text="Vestige" popup="true" icon="/META-INF/pluginIcon.svg">
+      <add-to-group group-id="EditorPopupMenu" anchor="last" />
+      <action id="Vestige.AnalyzeFile" class="com.codecharlan.vestige.ui.AnalyzeFileAction" text="Analyze Current File" description="Force re-analysis of the current file history" />
+      <action id="Vestige.CommandPalette" class="com.codecharlan.vestige.ui.CommandPaletteAction" text="Command Palette" description="Fuzzy search for all Vestige features">
+        <keyboard-shortcut keymap="$default" first-keystroke="control alt V" />
+      </action>
+      <action id="Vestige.ShowTimeline" class="com.codecharlan.vestige.ui.ShowTimelineAction" text="Show File Timeline" description="Open the temporal timeline for the current file" />
+      <action id="Vestige.HistoryQuery" class="com.codecharlan.vestige.ui.HistoryQueryAction" text="Search Project Lore" description="Query historical decisions using natural language" />
+      <action id="Vestige.AddDecision" class="com.codecharlan.vestige.ui.AddDecisionAction" text="Add Lore Decision ➕" description="Record a new architectural decision" />
+      <action id="Vestige.ShowEvolution" class="com.codecharlan.vestige.ui.ShowEvolutionAction" text="Show Code Evolution" description="Visualize how the project has changed over time" />
+      <action id="Vestige.Rewind" class="com.codecharlan.vestige.ui.RewindAction" text="Rewind Time ⏪" description="Checkout a previous commit to explore history" />
+      <separator />
+      <action id="Vestige.ChatWithGhost" class="com.codecharlan.vestige.ui.ChatWithGhostAction" text="Chat with Ghost &#x1f47b;" description="Consult the AI about code history" />
+      <action id="Vestige.Wormhole" class="com.codecharlan.vestige.ui.WormholeAction" text="Open Wormhole &#x1f573;️" description="Bridge historical code into the present" />
+      <action id="Vestige.ToggleEcho" class="com.codecharlan.vestige.ui.ToggleEchoAction" text="Toggle Echo Chamber &#x1f50a;" description="Auditory code health feedback" />
+      <action id="Vestige.ShowPet" class="com.codecharlan.vestige.ui.ShowPetDetailsAction" text="Inspect Cipher Pet ✨" description="Interact with your code archaeologist companion" />
+      <action id="Vestige.ShareLore" class="com.codecharlan.vestige.ui.ShareLoreAction" text="Share Lore to Team &#x1f680;" description="Export insights to Slack/Discord" />
+      <separator />
+      <action id="Vestige.ClearCache" class="com.codecharlan.vestige.ui.ClearCacheAction" text="Clear Vestige Cache" description="Purge cached analysis data" />
+      <action id="Vestige.Toggle" class="com.codecharlan.vestige.ui.ToggleAnnotationsAction" text="Toggle Annotations" description="Enable/Disable temporal annotations" />
+    </group>
+  </actions>
+</idea-plugin>

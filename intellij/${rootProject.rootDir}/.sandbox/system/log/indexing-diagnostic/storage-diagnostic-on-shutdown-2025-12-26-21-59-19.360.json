@@ -1,0 +1,48 @@
+{
+  "pageCacheStats" : {
+    "cachedChannelsStatistics" : {
+      "hit" : 9,
+      "miss" : 0,
+      "load" : 5,
+      "capacity" : 400
+    },
+    "uncachedFileAccess" : 3,
+    "maxRegisteredFiles" : 15,
+    "maxCacheSizeInBytes" : 13647872,
+    "totalCachedSizeInBytes" : 1048576,
+    "pageHits" : 0,
+    "pageFastCacheHits" : 243,
+    "pageLoadsAboveSizeThreshold" : 0,
+    "regularPageLoads" : 6,
+    "disposedBuffers" : 5,
+    "totalPageDisposalUs" : 68,
+    "totalPageLoadUs" : 2077320,
+    "totalPagesLoaded" : 6,
+    "capacityInBytes" : 524288000
+  },
+  "indexStorageStats" : {
+    "indexStoragesStats" : { },
+    "otherStoragesStats" : {
+      "statsPerEnumerator" : {
+        "rep.names" : {
+          "collisions" : 0,
+          "values" : 0,
+          "dataFileSizeInBytes" : 0,
+          "storageSizeInBytes" : 96,
+          "btreeStatistics" : {
+            "pages" : 0,
+            "elements" : 0,
+            "height" : 0,
+            "moves" : 0,
+            "leafPages" : 1,
+            "maxSearchStepsInRequest" : 0,
+            "searchRequests" : 0,
+            "searchSteps" : 0,
+            "pageCapacity" : 32768,
+            "sizeInBytes" : 0
+          }
+        }
+      }
+    }
+  }
+}
