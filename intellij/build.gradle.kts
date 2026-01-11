@@ -9,7 +9,7 @@ plugins {
 val platformVersion = "2023.2.1"
 
 // Plugin version
-val pluginVersion = "1.0.6.1"
+val pluginVersion = "1.0.6.2"
 
 group = "com.codecharlan"
 version = pluginVersion

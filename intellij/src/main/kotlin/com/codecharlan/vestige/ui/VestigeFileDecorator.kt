@@ -18,10 +18,11 @@ class VestigeFileDecorator : ProjectViewNodeDecorator {
         data.addText(file.name, SimpleTextAttributes.REGULAR_ATTRIBUTES)
 
         if (isDir) {
+            // Passive check for directories: only use what's already in cache
             val children = file.children.filter { !it.isDirectory }
             if (children.isEmpty()) return
             
-            val childStats = children.mapNotNull { service.analyzeFile(it)?.stats }
+            val childStats = children.mapNotNull { service.getCachedAnalysis(it)?.stats }
             if (childStats.isEmpty()) return
             
             val avgCommits = childStats.map { it.commits }.average().toInt()
@@ -44,12 +45,20 @@ class VestigeFileDecorator : ProjectViewNodeDecorator {
             return
         }
         
-        // Individual File Decoration
-        val result = service.analyzeFile(file) ?: return
+        // Individual File Decoration: Passive with async fallback
+        val result = service.getCachedAnalysis(file)
+        
+        // If no cache, trigger async analysis (but don't wait)
+        if (result == null) {
+            service.analyzeFileAsync(file)
+            return // No decoration this time, will appear on next refresh
+        }
+        
         val stats = result.stats
         val realTime = result.realTimeStats
         
         val badges = mutableListOf<String>()
+        // ... (rest of the badge logic remains same)
         if (stats != null) {
             when {
                 stats.commits > 20 -> badges.add("🔥")
@@ -67,7 +76,7 @@ class VestigeFileDecorator : ProjectViewNodeDecorator {
                 } else if (it.complexity > 30) {
                     badges.add("⚙️")
                 } else {
-                    // No badge
+                    // Nothing
                 }
             }
         }

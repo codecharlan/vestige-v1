@@ -1,6 +1,7 @@
 package com.codecharlan.vestige.ui
 
 import com.intellij.icons.AllIcons
+import com.codecharlan.vestige.logic.VestigeService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -52,7 +53,7 @@ class VestigeToolWindowFactory : ToolWindowFactory {
         */
 
         // Gravity Well Tab
-        val wellPanel = VestigeGravityWellPanel()
+        val wellPanel = VestigeGravityWellPanel(project)
         val wellContent = contentFactory.createContent(wellPanel, "Gravity Well", false)
         toolWindow.contentManager.addContent(wellContent)
 
@@ -80,5 +81,14 @@ class VestigeToolWindowFactory : ToolWindowFactory {
         val evolutionGraphPanel = VestigeEvolutionGraphPanel(project)
         val evolutionGraphContent = contentFactory.createContent(evolutionGraphPanel, "Evolution Graph", false)
         toolWindow.contentManager.addContent(evolutionGraphContent)
+        // ... (existing tabs) ...
+        
+        // Trigger initial analysis for current file once indexing is done
+        com.intellij.openapi.project.DumbService.getInstance(project).runWhenSmart {
+            val fileEditorManager = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+            fileEditorManager.selectedFiles.firstOrNull()?.let { file ->
+                project.getService(VestigeService::class.java).analyzeFileAsync(file)
+            }
+        }
     }
 }

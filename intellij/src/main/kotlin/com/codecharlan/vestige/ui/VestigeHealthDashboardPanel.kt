@@ -7,6 +7,9 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import java.awt.*
 import java.awt.geom.RoundRectangle2D
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
+import com.intellij.util.concurrency.AppExecutorUtil
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 
@@ -28,6 +31,45 @@ class VestigeHealthDashboardPanel(private val project: Project) : JPanel() {
                 foreground = VestigeUI.Purple
             }, BorderLayout.WEST)
         }
+        add(header, BorderLayout.NORTH)
+        
+        showLoadingState()
+        
+        // Load health score in background
+        ReadAction.nonBlocking<VestigeHealthScore.HealthScore> {
+            project.getService(VestigeHealthScore::class.java).calculateHealthScore()
+        }
+        .inSmartMode(project)
+        .finishOnUiThread(ModalityState.any()) { healthScore ->
+            updateUI(healthScore)
+        }
+        .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    private fun showLoadingState() {
+        val loadingPanel = JPanel(GridBagLayout()).apply {
+            background = VestigeUI.DeepSlate
+            add(JBLabel("Calculating Project Health Archaeometry...").apply {
+                font = VestigeUI.InterFont.deriveFont(14f)
+                foreground = VestigeUI.Purple
+            })
+        }
+        add(loadingPanel, BorderLayout.CENTER)
+        revalidate()
+        repaint()
+    }
+
+    private fun updateUI(healthScore: VestigeHealthScore.HealthScore) {
+        removeAll()
+        
+        val header = JPanel(BorderLayout()).apply {
+            background = VestigeUI.HologramBlue
+            border = JBUI.Borders.empty(16, 16)
+            add(JBLabel("🏥 Code Health Dashboard").apply {
+                font = VestigeUI.InterFont.deriveFont(18f)
+                foreground = VestigeUI.Purple
+            }, BorderLayout.WEST)
+        }
         
         val contentPanel = JPanel().apply {
             layout = GridBagLayout()
@@ -40,9 +82,6 @@ class VestigeHealthDashboardPanel(private val project: Project) : JPanel() {
             anchor = GridBagConstraints.NORTHWEST
             fill = GridBagConstraints.HORIZONTAL
         }
-        
-        // Load health score
-        val healthScore = project.getService(VestigeHealthScore::class.java).calculateHealthScore()
         
         // Overall Score Card
         gbc.gridx = 0
@@ -84,6 +123,9 @@ class VestigeHealthDashboardPanel(private val project: Project) : JPanel() {
         
         add(header, BorderLayout.NORTH)
         add(scrollPane, BorderLayout.CENTER)
+        
+        revalidate()
+        repaint()
     }
     
     private fun createScoreCard(title: String, score: Double, description: String): JPanel {

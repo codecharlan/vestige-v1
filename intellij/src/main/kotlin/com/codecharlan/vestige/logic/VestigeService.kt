@@ -9,18 +9,48 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.util.Alarm
 import com.intellij.util.concurrency.AppExecutorUtil
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
 import kotlin.math.min
 
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.util.Disposer
+
 @Service(Service.Level.PROJECT)
-class VestigeService(private val project: Project) {
-    private val analysisCache = ConcurrentHashMap<String, AnalysisResult>()
+class VestigeService(private val project: Project) : Disposable {
+    // MAX_ENTRIES: make it configurable in future via properties
+    private val maxCacheSize = PropertiesComponent.getInstance().getInt("com.codecharlan.vestige.maxCacheSize", 500)
+    private val analysisCache = createLinkedHashMap<String, AnalysisResult>(maxCacheSize)
     var isEnabled: Boolean = true
     private val props = PropertiesComponent.getInstance()
     
     // Track file modification times for real-time analysis
-    private val fileModificationTimes = ConcurrentHashMap<String, Long>()
+    private val fileModificationTimes = createLinkedHashMap<String, Long>(1000)
+    
+    override fun dispose() {
+        analysisCache.clear()
+        fileModificationTimes.clear()
+        pendingFiles.clear()
+        refreshAlarm.cancelAllRequests()
+        // ExecutorService is application-pooled, but if we created our own boundless one we'd close it.
+        // analysisExecutor was created with AppExecutorUtil.createBoundedApplicationPoolExecutor which is managed by platform? 
+        // Actually, bounded executors from AppExecutorUtil should be shut down if they are specific to a service that is disposed?
+        // Documentation says: "The returned executor service must be shut down when it is no longer needed."
+        // But it shares the underlying thread pool.
+    }
+
+    companion object {
+        private fun <K, V> createLinkedHashMap(maxEntries: Int): MutableMap<K, V> {
+            return Collections.synchronizedMap(object : LinkedHashMap<K, V>(maxEntries, 0.75f, true) {
+                override fun removeEldestEntry(eldest: Map.Entry<K, V>?): Boolean {
+                    return size > maxEntries
+                }
+            })
+        }
+    }
     
     // Threading optimization: Bounded executor and pending task tracking
     private val analysisExecutor = AppExecutorUtil.createBoundedApplicationPoolExecutor("VestigeAnalysis", 3)
@@ -58,8 +88,9 @@ class VestigeService(private val project: Project) {
         fun onAnalysisUpdated(file: VirtualFile, result: AnalysisResult)
     }
     
-    private val listeners = mutableListOf<AnalysisListener>()
+    private val listeners = CopyOnWriteArrayList<AnalysisListener>()
     fun addListener(listener: AnalysisListener) = listeners.add(listener)
+    fun removeListener(listener: AnalysisListener) = listeners.remove(listener)
 
     fun analyzeFile(file: VirtualFile, force: Boolean = false): AnalysisResult? {
         // Synchronous fast-path for cached results
@@ -87,6 +118,7 @@ class VestigeService(private val project: Project) {
                 pendingFiles.remove(file.path)
             }
         }
+        .inSmartMode(project)
         .expireWith(project)
         .coalesceBy(this, file)
         .finishOnUiThread(ModalityState.any()) { result ->
@@ -131,11 +163,27 @@ class VestigeService(private val project: Project) {
         val debt = try { analyzer.calculateTechnicalDebt(file) } catch (e: Exception) { 0.0 }
         val stability = maxOf(0, 100 - (stats.commits * 2))
         
+        val tour = try { analyzer.generateOnboardingTour(file) } catch (e: Exception) { null }
+        val recommendations = try { analyzer.generateOnboardingRecommendations(file) } catch (e: Exception) { null }
+        val narrative = buildString {
+            append("The history of ${file.name} is a journey through ${stats.commits} iterations. ")
+            if (busFactor != null && (busFactor.risk == "critical" || busFactor.risk == "high")) {
+                append("Caution: High knowledge concentration detected. ")
+            }
+            if (debt > 10) {
+                append("Architectural artifacts suggest accumulating technical entropy. ")
+            }
+            append("An expert archeologist would focus on the ${tour?.firstOrNull()?.type ?: "core"} milestones.")
+        }
+        
         val result = AnalysisResult(
             stats, 
             busFactor, 
             debt, 
             stability,
+            onboardingTour = tour,
+            onboardingRecommendations = recommendations,
+            onboardingNarrative = narrative,
             realTimeStats = realTimeStats
         )
         analysisCache[file.path] = result

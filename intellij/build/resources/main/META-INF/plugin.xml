@@ -1,5 +1,5 @@
 <idea-plugin>
-  <version>1.0.6.1</version>
+  <version>1.0.6.2</version>
   <idea-version since-build="232" until-build="252.*" />
   <id>com.codecharlan.vestige</id>
   <name>Vestige - Temporal Code Intelligence</name>
@@ -22,7 +22,15 @@
 
     Experience Zenith Elite Aesthetics with kinetic typography, glassmorphism, and bioluminescent UI indicators.]]></description>
   <category>Code tools</category>
-  <change-notes><![CDATA[<b>Version 1.0.6.1 (Zenith Release)</b>
+  <change-notes><![CDATA[<b>Version 1.0.6.2 (Stability & Performance)</b>
+    <ul>
+        <li>✨ <b>Critical Stability Fix:</b> Resolved a concurrency issue in the Git Analyzer (HashMap -> ConcurrentHashMap) that caused eventual UI freezes.</li>
+        <li>🛠️ <b>Resource Management:</b> Fixed a file handle leak by properly disposing of JGit repositories on project close.</li>
+        <li>🚀 <b>Performance:</b> Eliminated UI refresh storms with smart 500ms throttling; Heatmaps now load reliably without lagging the editor.</li>
+        <li>🛡️ <b>Scalability:</b> Implemented a configurable, size-limited LRU cache (default 500 files) to prevent memory bloating in large repositories.</li>
+        <li>🧹 <b>Cleanup:</b> VestigeService now rigorously cleans up all background tasks and caches on shutdown.</li>
+    </ul>
+    <b>Version 1.0.6.1 (Zenith Release)</b>
     <ul>
         <li>✨ <b>Zenith Upgrade:</b> Re-engineered the core analysis engine for asynchronous, multi-threaded performance. No more UI lag!</li>
         <li>🎨 <b>Aura Panel:</b> Introduced a premium JCEF-powered dashboard with glassmorphic aesthetics and real-time health metrics.</li>

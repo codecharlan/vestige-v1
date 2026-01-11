@@ -16,9 +16,11 @@ class VestigeEvolutionReplay : JPanel() {
     init {
         isOpaque = false
         val timer = Timer(50) {
-            time += 0.1
-            updateRipples()
-            repaint()
+            if (isShowing) {
+                time += 0.1
+                updateRipples()
+                repaint()
+            }
         }
         timer.start()
     }

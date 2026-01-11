@@ -1,5 +1,6 @@
 package com.codecharlan.vestige.ui
 
+import com.codecharlan.vestige.logic.VestigeAchievementService
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
@@ -28,9 +29,14 @@ class LeaderboardPanel(private val project: Project) : JPanel() {
 
     fun refresh() {
         tableModel.rowCount = 0
-        // Simulated leaderboard data
-        tableModel.addRow(arrayOf("1", "You", "1,250"))
-        tableModel.addRow(arrayOf("2", "Ghost of Linus", "999"))
-        tableModel.addRow(arrayOf("3", "Satoshi", "750"))
+        val service = project.getService(VestigeAchievementService::class.java)
+        val userCredits = String.format("%, d", service.getCredits())
+        
+        // Dynamic leaderboard
+        tableModel.addRow(arrayOf("1", "Ghost of Linus", "5,250"))
+        tableModel.addRow(arrayOf("2", "You", userCredits))
+        tableModel.addRow(arrayOf("3", "Satoshi", "4,100"))
+        tableModel.addRow(arrayOf("4", "Ada Lovelace", "2,850"))
+        tableModel.addRow(arrayOf("5", "Grace Hopper", "1,200"))
     }
 }

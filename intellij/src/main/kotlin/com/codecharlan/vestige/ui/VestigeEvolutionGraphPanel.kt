@@ -9,7 +9,9 @@ import com.intellij.util.ui.JBUI
 import java.awt.*
 import java.awt.geom.Line2D
 import java.awt.geom.RoundRectangle2D
-import com.codecharlan.vestige.ui.withAlpha
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
+import com.intellij.util.concurrency.AppExecutorUtil
 import javax.swing.JPanel
 import javax.swing.border.EmptyBorder
 
@@ -58,20 +60,26 @@ class VestigeEvolutionGraphPanel(private val project: Project) : JPanel() {
         val fileEditorManager = FileEditorManager.getInstance(project)
         val currentFile = fileEditorManager.selectedFiles.firstOrNull() ?: return
         
-        val gitAnalyzer = project.getService(VestigeGitAnalyzer::class.java)
-        val history = gitAnalyzer.getFileHistory(currentFile, 50)
-        
-        commits.clear()
-        history.forEachIndexed { index, commit ->
-            commits.add(CommitNode(
-                hash = commit.hash.take(7),
-                date = commit.date.time,
-                author = commit.author,
-                message = commit.message.take(50)
-            ))
+        ReadAction.nonBlocking<List<CommitNode>> {
+            val gitAnalyzer = project.getService(VestigeGitAnalyzer::class.java)
+            val history = gitAnalyzer.getFileHistory(currentFile, 50)
+            
+            history.map { commit ->
+                CommitNode(
+                    hash = commit.hash.take(7),
+                    date = commit.date.time,
+                    author = commit.author,
+                    message = commit.message.take(50)
+                )
+            }
         }
-        
-        repaint()
+        .inSmartMode(project)
+        .finishOnUiThread(ModalityState.any()) { nodes ->
+            commits.clear()
+            commits.addAll(nodes)
+            repaint()
+        }
+        .submit(AppExecutorUtil.getAppExecutorService())
     }
     
     private inner class EvolutionGraphCanvas : JPanel() {

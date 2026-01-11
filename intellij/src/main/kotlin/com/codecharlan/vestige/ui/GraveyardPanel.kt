@@ -5,6 +5,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.awt.BorderLayout
 import javax.swing.JPanel
 import javax.swing.table.DefaultTableModel
@@ -29,10 +32,17 @@ class GraveyardPanel(private val project: Project) : JPanel() {
 
     fun refresh() {
         tableModel.rowCount = 0
-        val analyzer = project.getService(VestigeGitAnalyzer::class.java)
-        val deleted = analyzer.findDeletedFiles()
-        deleted.forEach { data ->
-            tableModel.addRow(arrayOf(data["path"] ?: "Unknown", data["author"] ?: "Unknown", data["date"] ?: "Unknown"))
+        
+        ReadAction.nonBlocking<List<Map<String, String>>> {
+            val analyzer = project.getService(VestigeGitAnalyzer::class.java)
+            analyzer.findDeletedFiles()
         }
+        .inSmartMode(project)
+        .finishOnUiThread(ModalityState.any()) { deleted ->
+            deleted.forEach { data ->
+                tableModel.addRow(arrayOf(data["path"] ?: "Unknown", data["author"] ?: "Unknown", data["date"] ?: "Unknown"))
+            }
+        }
+        .submit(AppExecutorUtil.getAppExecutorService())
     }
 }

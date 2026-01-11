@@ -1,18 +1,26 @@
 package com.codecharlan.vestige.ui
 
 import com.codecharlan.vestige.logic.VestigeGitAnalyzer
+import com.codecharlan.vestige.logic.VestigeService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import java.awt.*
 import java.text.SimpleDateFormat
 import javax.swing.*
 
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.util.Disposer
+import java.awt.event.MouseAdapter
+import javax.swing.Timer
+import kotlin.math.*
+
 /**
  * Onboarding Assistant Panel - Displays AI narratives, expert recommendations,
  * and milestone timeline for new developers
  */
-class VestigeOnboardingPanel(private val project: Project) : JPanel(BorderLayout()) {
+class VestigeOnboardingPanel(private val project: Project) : JPanel(BorderLayout()), VestigeService.AnalysisListener, Disposable {
     
     private val contentPanel = JPanel()
     private val scrollPane = JBScrollPane(contentPanel)
@@ -21,6 +29,22 @@ class VestigeOnboardingPanel(private val project: Project) : JPanel(BorderLayout
         contentPanel.layout = BoxLayout(contentPanel, BoxLayout.Y_AXIS)
         contentPanel.background = JBColor.background()
         add(scrollPane, BorderLayout.CENTER)
+        project.getService(VestigeService::class.java).addListener(this)
+        Disposer.register(project, this)
+    }
+
+    override fun dispose() {
+        project.getService(VestigeService::class.java).removeListener(this)
+    }
+
+    override fun onAnalysisUpdated(file: VirtualFile, result: VestigeService.AnalysisResult) {
+        // Only update if it's the currently selected file or if the panel is empty
+        updateOnboardingData(
+            result.onboardingNarrative,
+            result.onboardingTour ?: emptyList(),
+            result.onboardingRecommendations,
+            file.name
+        )
     }
     
     fun updateOnboardingData(

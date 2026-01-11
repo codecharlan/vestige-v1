@@ -1,5 +1,10 @@
 package com.codecharlan.vestige.ui
 
+import com.codecharlan.vestige.logic.VestigeService
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBColor
 import java.awt.*
 import java.awt.event.MouseAdapter
@@ -8,14 +13,18 @@ import javax.swing.JPanel
 import javax.swing.Timer
 import kotlin.math.*
 
-class VestigeGravityWellPanel : JPanel() {
+class VestigeGravityWellPanel(private val project: Project) : JPanel(), VestigeService.AnalysisListener, Disposable {
     private var angle = 0.0
     private var mouseX = 0
     private var mouseY = 0
+    private var gravityLevel = 1.0
+    private var complexityAlpha = 150
 
     init {
         isOpaque = false
         preferredSize = Dimension(300, 300)
+        project.getService(VestigeService::class.java).addListener(this)
+        Disposer.register(project, this)
         
         addMouseMotionListener(object : MouseAdapter() {
             override fun mouseMoved(e: MouseEvent) {
@@ -26,10 +35,22 @@ class VestigeGravityWellPanel : JPanel() {
         })
 
         val timer = Timer(30) {
-            angle += 0.05
-            repaint()
+            if (isShowing) {
+                angle += 0.05
+                repaint()
+            }
         }
         timer.start()
+    }
+
+    override fun onAnalysisUpdated(file: VirtualFile, result: VestigeService.AnalysisResult) {
+        gravityLevel = 1.0 + (result.stats?.commits ?: 0) / 10.0
+        complexityAlpha = min(255, 150 + (result.realTimeStats?.complexity ?: 0))
+        repaint()
+    }
+
+    override fun dispose() {
+        project.getService(VestigeService::class.java).removeListener(this)
     }
 
     override fun paintComponent(g: Graphics) {
@@ -42,15 +63,15 @@ class VestigeGravityWellPanel : JPanel() {
         // Draw Radial Background Gird
         g2.color = Color(60, 165, 250, 40)
         for (i in 1..5) {
-            val r = i * 40
+            val r = (i * 40 * gravityLevel).toInt()
             g2.drawOval(cx - r, cy - r, r * 2, r * 2)
         }
 
         // Draw Pulsating Gravity Well
-        val pulse = (sin(angle) * 10).toInt()
-        val wellR = 30 + pulse
+        val pulse = (sin(angle) * 10 * gravityLevel).toInt()
+        val wellR = (30 * gravityLevel).toInt() + pulse
         val grad = RadialGradientPaint(
-            Point(cx, cy), wellR.toFloat(), 
+            Point(cx, cy), max(1f, wellR.toFloat()), 
             floatArrayOf(0f, 1f), 
             arrayOf(Color(139, 92, 246, 200), Color(139, 92, 246, 0))
         )
@@ -59,15 +80,15 @@ class VestigeGravityWellPanel : JPanel() {
 
         // Draw Orbiting Particles (Simulating 3D context)
         for (i in 0..8) {
-            val orbitR = 80 + i * 15
-            val speed = 0.5 + i * 0.1
+            val orbitR = (80 + i * 15 * gravityLevel).toInt()
+            val speed = (0.5 + i * 0.1) * gravityLevel
             val pAngle = angle * speed + (i * PI / 4)
             
             val x = (cx + orbitR * cos(pAngle)).toInt()
             val y = (cy + orbitR * sin(pAngle) * 0.4).toInt() // Elliptical for perspective
             
-            val size = 4 + (sin(pAngle) * 2).toInt() // Pseudo-depth size
-            val alpha = 150 + (sin(pAngle) * 100).toInt()
+            val size = (4 + (sin(pAngle) * 2).toInt() * gravityLevel).toInt() // Pseudo-depth size
+            val alpha = complexityAlpha + (sin(pAngle) * 100).toInt()
             
             g2.color = Color(96, 165, 250, max(0, min(255, alpha)))
             g2.fillOval(x - size / 2, y - size / 2, size, size)

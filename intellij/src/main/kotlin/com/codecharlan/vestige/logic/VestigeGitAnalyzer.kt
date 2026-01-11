@@ -1,5 +1,6 @@
 package com.codecharlan.vestige.logic
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -14,16 +15,16 @@ import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.treewalk.AbstractTreeIterator
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import org.eclipse.jgit.treewalk.filter.PathFilter
+import com.intellij.openapi.vfs.VirtualFileManager
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
-
+import java.util.concurrent.ConcurrentHashMap
+import java.io.File
 import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.*
-import com.intellij.openapi.vfs.VirtualFileManager
-import java.io.File
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -35,7 +36,7 @@ private fun File.toVirtualFile(project: Project) =
     VirtualFileManager.getInstance().findFileByUrl("file://${this.absolutePath}")
 
 @Service(Service.Level.PROJECT)
-class VestigeGitAnalyzer(private val project: Project) {
+class VestigeGitAnalyzer(private val project: Project) : Disposable {
 
     data class FileStats(
         val commits: Int,
@@ -46,8 +47,19 @@ class VestigeGitAnalyzer(private val project: Project) {
         val stability: Int = 100
     )
 
-    private val analysisCache = mutableMapOf<String, FileStats>()
-    private val gitCache = mutableMapOf<String, Git?>()
+    private val gitCache = ConcurrentHashMap<String, Git>()
+
+    override fun dispose() {
+        gitCache.values.forEach { git ->
+            try {
+                git.repository.close()
+                git.close()
+            } catch (e: Exception) {
+                // Ignore close errors
+            }
+        }
+        gitCache.clear()
+    }
 
     private fun getGitRepo(file: VirtualFile): Git? {
         val projectBase = project.basePath ?: return null
@@ -58,45 +70,68 @@ class VestigeGitAnalyzer(private val project: Project) {
             val gitDir = File(current, ".git")
             if (gitDir.exists() && gitDir.isDirectory) {
                 val repoRoot = current.absolutePath
-                return gitCache.getOrPut(repoRoot) {
-                    try {
-                        val repository = FileRepositoryBuilder()
-                            .setGitDir(gitDir)
-                            .readEnvironment()
-                            .build()
-                        Git(repository)
-                    } catch (e: Exception) {
-                        null
+                
+                // Check cache first
+                val cached = gitCache[repoRoot]
+                if (cached != null) return cached
+                
+                // Try to create new instance
+                val newGit = try {
+                    val repository = FileRepositoryBuilder()
+                        .setGitDir(gitDir)
+                        .readEnvironment()
+                        .build()
+                    Git(repository)
+                } catch (e: Exception) {
+                    null
+                }
+                
+                if (newGit != null) {
+                    val existing = gitCache.putIfAbsent(repoRoot, newGit)
+                    if (existing != null) {
+                        try { newGit.close() } catch (ignored: Exception) {}
+                        return existing
                     }
+                    return newGit
                 }
             }
             current = current.parentFile
         }
         
         // Fallback: check project root
-        return gitCache.getOrPut(projectBase) {
-            try {
-                val repository = FileRepositoryBuilder()
-                    .setGitDir(File(projectBase, ".git"))
-                    .readEnvironment()
-                    .findGitDir()
-                    .build()
-                Git(repository)
-            } catch (e: Exception) {
-                null
-            }
+        val cached = gitCache[projectBase]
+        if (cached != null) return cached
+
+        val newGit = try {
+            val repository = FileRepositoryBuilder()
+                .setGitDir(File(projectBase, ".git"))
+                .readEnvironment()
+                .findGitDir()
+                .build()
+            Git(repository)
+        } catch (e: Exception) {
+            null
         }
+        
+        if (newGit != null) {
+            val existing = gitCache.putIfAbsent(projectBase, newGit)
+            if (existing != null) {
+                try { newGit.close() } catch (ignored: Exception) {}
+                return existing
+            }
+            return newGit
+        }
+        
+        return null
     }
 
     fun analyzeFile(file: VirtualFile, force: Boolean = false): FileStats? {
         val git = getGitRepo(file) ?: return null
         val repo = git.repository
         val filePath = file.path.substring(repo.directory.parent.length + 1)
-        val cacheKey = "${file.path}|${repo.fullBranch}"
-
-        if (!force && analysisCache.containsKey(cacheKey)) {
-            return analysisCache[cacheKey]
-        }
+        
+        
+        // Removed internal cache check to prevent memory leak and redundancy
 
         return try {
             val log = git.log()
@@ -129,7 +164,6 @@ class VestigeGitAnalyzer(private val project: Project) {
                 lastModifiedDate = Date(lastCommit.commitTime.toLong() * 1000L)
             )
 
-            analysisCache[cacheKey] = stats
             stats
         } catch (e: Exception) {
             null
