@@ -1,5 +1,5 @@
 const assert = require('assert');
-const AIService = require('../../ai-service');
+const AIService = require('../../dist/ai-service');
 const vscode = require('vscode');
 
 suite('AIService Test Suite', () => {
@@ -43,15 +43,30 @@ suite('AIService Test Suite', () => {
         assert.strictEqual(result, 'AI Explanation');
     });
 
-    test('explainText throws error if no API key configured', async () => {
+    test('explainText throws when no AI backend is available', async () => {
+        // No editor language model (vscode.lm absent in the mock) and no key.
         vscode.workspace.getConfiguration = (section) => ({
             get: (key) => null
         });
 
         await assert.rejects(
             async () => await service.explainText('prompt'),
-            /API key not configured/
+            /No AI backend available/
         );
+    });
+
+    test('isAvailable reports false with no model and no key', async () => {
+        vscode.workspace.getConfiguration = (section) => ({
+            get: (key) => null
+        });
+        assert.strictEqual(await service.isAvailable(), false);
+    });
+
+    test('isAvailable reports true once a key is configured', async () => {
+        vscode.workspace.getConfiguration = (section) => ({
+            get: (key) => 'config-key'
+        });
+        assert.strictEqual(await service.isAvailable(), true);
     });
 
     test('explainText returns explanation when key configured', async () => {

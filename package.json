@@ -1,8 +1,8 @@
 {
     "name": "vestige",
-    "displayName": "Vestige - Temporal Code Intelligence",
-    "description": "Uncover the traces of your codebase through time. AI-powered onboarding, inline temporal linting, and interactive file history tours.",
-    "version": "1.0.5",
+    "displayName": "Vestige — Change Risk from Git History",
+    "description": "Know what you're about to break. Reads your local git history to show which files change together, who actually knows the code you're editing, and what decisions already constrain it.",
+    "version": "1.1.0",
     "publisher": "codecharlan",
     "repository": {
         "type": "git",
@@ -10,27 +10,29 @@
     },
     "icon": "images/icon.png",
     "engines": {
-        "vscode": "^1.80.0"
+        "vscode": "^1.90.0"
     },
     "categories": [
-        "Linters",
+        "SCM Providers",
         "Visualization",
         "Other"
     ],
     "keywords": [
         "git",
-        "temporal",
-        "history",
-        "code age",
-        "archaeology",
+        "co-change",
+        "coupling",
+        "code ownership",
+        "code review",
+        "legacy code",
         "onboarding",
-        "AI",
-        "developer experience"
+        "git history",
+        "codeowners",
+        "technical debt"
     ],
     "activationEvents": [
         "onStartupFinished"
     ],
-    "main": "./extension.js",
+    "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
@@ -84,10 +86,6 @@
             {
                 "command": "vestige.stopRewind",
                 "title": "Vestige: Stop Rewind ⏩"
-            },
-            {
-                "command": "vestige.showLeaderboard",
-                "title": "Vestige: Show Leaderboard 🏆"
             },
             {
                 "command": "vestige.showPerformance",
@@ -180,8 +178,106 @@
             {
                 "command": "vestige.shareLore",
                 "title": "Vestige: Share Lore to Webhook 📤"
+            },
+            {
+                "command": "vestige.openTimeTravel",
+                "title": "Vestige: Open Time Travel Scrubbing ⏪"
+            },
+            {
+                "command": "vestige.askHistorian",
+                "title": "Vestige: Ask the Living Code Historian 💬"
+            },
+            {
+                "command": "vestige.showArchitectureMap",
+                "title": "Vestige: Show Architecture Map 🔭"
+            },
+            {
+                "command": "vestige.toggleEcho",
+                "title": "Vestige: Toggle Echo Chamber 🎵"
+            },
+            {
+                "command": "vestige.showPetDetails",
+                "title": "Vestige: Show Cipher Pet 🐣"
+            },
+            {
+                "command": "vestige.setOpenAIKey",
+                "title": "Vestige: Set OpenAI API Key 🔐"
+            },
+            {
+                "command": "vestige.showHandoffRisks",
+                "title": "Vestige: Show Knowledge Handoff Risks 🤝"
+            },
+            {
+                "command": "vestige.findExperts",
+                "title": "Vestige: Find Experts for This File 👤"
+            },
+            {
+                "command": "vestige.resurrectWithGhost",
+                "title": "Vestige: Resurrect Selection with Ghost 💀"
+            },
+            {
+                "command": "vestige.lineHistory",
+                "title": "Vestige: History of Selected Lines 🧬"
+            },
+            {
+                "command": "vestige.auditCodeowners",
+                "title": "Vestige: Audit CODEOWNERS Against History 🧾"
+            },
+            {
+                "command": "vestige.showCoupledFiles",
+                "title": "Vestige: Files That Change With This One 🔗"
             }
         ],
+        "keybindings": [
+            {
+                "command": "vestige.askHistorian",
+                "key": "ctrl+shift+h",
+                "mac": "cmd+shift+h",
+                "when": "editorTextFocus"
+            },
+            {
+                "command": "vestige.lineHistory",
+                "key": "ctrl+shift+l",
+                "mac": "cmd+shift+l",
+                "when": "editorTextFocus"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "vestige.lineHistory",
+                    "when": "editorTextFocus",
+                    "group": "vestige@1"
+                },
+                {
+                    "command": "vestige.showTimeline",
+                    "when": "editorTextFocus",
+                    "group": "vestige@2"
+                },
+                {
+                    "command": "vestige.findExperts",
+                    "when": "editorTextFocus",
+                    "group": "vestige@3"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "vestige.showGraveyard",
+                    "when": "view == vestige.graveyard",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "vestige.resurrectFile",
+                    "when": "view == vestige.graveyard && viewItem == deletedFile"
+                },
+                {
+                    "command": "vestige.viewDeletedFile",
+                    "when": "view == vestige.graveyard && viewItem == deletedFile"
+                }
+            ]
+        },
         "configuration": {
             "title": "Vestige",
             "properties": {
@@ -229,6 +325,38 @@
                     "type": "string",
                     "default": "",
                     "description": "Slack/Discord webhook URL for sharing Lore insights"
+                },
+                "vestige.enableCodeLens": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show Temporal CodeLens annotations above functions and classes"
+                },
+                "vestige.coupledFileSuggestions": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "After you save a file, suggest the files that git history shows usually change alongside it. Shows at most three, once per file per session, with the number of shared commits as evidence."
+                },
+                "vestige.coupledFileThreshold": {
+                    "type": "number",
+                    "default": 50,
+                    "minimum": 10,
+                    "maximum": 100,
+                    "markdownDescription": "Minimum co-change rate (percent of this file's recent commits that also touched the other file) before a file is suggested. Higher values mean fewer, more confident suggestions."
+                },
+                "vestige.codeLensMode": {
+                    "type": "string",
+                    "default": "risk-only",
+                    "enum": [
+                        "off",
+                        "risk-only",
+                        "detailed"
+                    ],
+                    "enumDescriptions": [
+                        "No CodeLens annotations.",
+                        "One annotation per function, and only where history indicates a real signal: a recorded decision, a churn hotspot, long stagnation, or concentrated ownership.",
+                        "Author and age above every function, plus all risk signals and quick actions."
+                    ],
+                    "markdownDescription": "How much CodeLens detail to show. `risk-only` keeps the editor quiet and only annotates code where the history actually matters."
                 }
             }
         },
@@ -243,19 +371,31 @@
         }
     },
     "scripts": {
-        "lint": "eslint .",
-        "pretest": "npm run lint",
-        "test": "node ./test/runTest.js"
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "lint": "eslint src test",
+        "pretest": "npm run lint && npm run compile",
+        "test": "npm run test:unit && npm run test:integration:git",
+        "pretest:unit": "npm run compile",
+        "test:unit": "mocha --ui tdd --require ./test/setup.js test/unit/*.test.js",
+        "test:integration": "node ./test/runTest.js",
+        "test:integration:git": "mocha --ui tdd --require ./test/setup-integration.js test/integration/*.test.js",
+        "pretest:integration:git": "npm run compile"
     },
     "dependencies": {
         "simple-git": "^3.19.1"
     },
     "devDependencies": {
-        "@types/vscode": "^1.80.0",
-        "@types/node": "^20.x",
-        "eslint": "^8.47.0",
-        "mocha": "^10.2.0",
+        "@types/node": "^20.19.41",
+        "@types/vscode": "^1.90.0",
+        "@typescript-eslint/eslint-plugin": "^6.21.0",
+        "@typescript-eslint/parser": "^6.21.0",
         "@vscode/test-electron": "^2.3.4",
-        "glob": "^10.3.3"
+        "eslint": "^8.47.0",
+        "glob": "^10.3.3",
+        "mocha": "^12.0.0",
+        "rimraf": "^6.1.3",
+        "typescript": "^6.0.3"
     }
 }

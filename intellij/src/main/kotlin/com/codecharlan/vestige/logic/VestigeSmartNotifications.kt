@@ -117,6 +117,29 @@ class VestigeSmartNotifications(private val project: Project) {
     }
     
     /**
+     * Show a warning notification. Preferred over a modal dialog for
+     * background/async failures and unconfigured-integration states.
+     */
+    fun showWarning(title: String, message: String) {
+        notificationGroup.createNotification(
+            title,
+            message,
+            NotificationType.WARNING
+        ).notify(project)
+    }
+
+    /**
+     * Show an error notification.
+     */
+    fun showError(title: String, message: String) {
+        notificationGroup.createNotification(
+            title,
+            message,
+            NotificationType.ERROR
+        ).notify(project)
+    }
+
+    /**
      * Show helpful tip about Vestige features
      */
     fun showTip() {

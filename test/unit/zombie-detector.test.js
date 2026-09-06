@@ -1,5 +1,5 @@
 const assert = require('assert');
-const ZombieDetector = require('../../zombie-detector');
+const ZombieDetector = require('../../dist/zombie-detector');
 const vscode = require('vscode');
 
 suite('ZombieDetector Test Suite', () => {

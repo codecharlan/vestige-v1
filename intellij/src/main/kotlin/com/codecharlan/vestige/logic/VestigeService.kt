@@ -7,6 +7,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.util.Alarm
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.util.Collections
@@ -25,26 +27,28 @@ class VestigeService(private val project: Project) : Disposable {
     private val maxCacheSize = PropertiesComponent.getInstance().getInt("com.codecharlan.vestige.maxCacheSize", 500)
     private val analysisCache = createLinkedHashMap<String, AnalysisResult>(maxCacheSize)
     var isEnabled: Boolean = true
-    private val props = PropertiesComponent.getInstance()
-    
+
     // Track file modification times for real-time analysis
     private val fileModificationTimes = createLinkedHashMap<String, Long>(1000)
-    
+
     override fun dispose() {
         analysisCache.clear()
         fileModificationTimes.clear()
         pendingFiles.clear()
         refreshAlarm.cancelAllRequests()
-        // ExecutorService is application-pooled, but if we created our own boundless one we'd close it.
-        // analysisExecutor was created with AppExecutorUtil.createBoundedApplicationPoolExecutor which is managed by platform? 
-        // Actually, bounded executors from AppExecutorUtil should be shut down if they are specific to a service that is disposed?
-        // Documentation says: "The returned executor service must be shut down when it is no longer needed."
-        // But it shares the underlying thread pool.
+        // Bounded executors from AppExecutorUtil must be shut down when their owner is disposed.
+        analysisExecutor.shutdownNow()
     }
 
     companion object {
+        /** Wide enough that a burst of analyses collapses into one repaint. */
+        private const val PROJECT_VIEW_REFRESH_DELAY_MS = 2_000
+
         private fun <K, V> createLinkedHashMap(maxEntries: Int): MutableMap<K, V> {
-            return Collections.synchronizedMap(object : LinkedHashMap<K, V>(maxEntries, 0.75f, true) {
+            // Insertion-order, not access-order: an access-order LinkedHashMap
+            // treats `get` as a structural modification, so every EDT cache
+            // read contended on the same monitor as the background writers.
+            return Collections.synchronizedMap(object : LinkedHashMap<K, V>(maxEntries, 0.75f, false) {
                 override fun removeEldestEntry(eldest: Map.Entry<K, V>?): Boolean {
                     return size > maxEntries
                 }
@@ -56,6 +60,7 @@ class VestigeService(private val project: Project) : Disposable {
     private val analysisExecutor = AppExecutorUtil.createBoundedApplicationPoolExecutor("VestigeAnalysis", 3)
     private val pendingFiles = ConcurrentHashMap.newKeySet<String>()
     private val refreshAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, project)
+    private val refreshPending = java.util.concurrent.atomic.AtomicBoolean(false)
 
     data class AnalysisResult(
         val stats: VestigeGitAnalyzer.FileStats?,
@@ -66,6 +71,8 @@ class VestigeService(private val project: Project) : Disposable {
         val onboardingRecommendations: VestigeGitAnalyzer.OnboardingRecommendations? = null,
         val onboardingNarrative: String? = null,
         val timestamp: Long = System.currentTimeMillis(),
+        /** Stamp of the file this result was computed from; drives cache validity. */
+        val modificationStamp: Long = -1,
         // New: Real-time analysis that works without git
         val realTimeStats: RealTimeStats? = null
     )
@@ -93,20 +100,24 @@ class VestigeService(private val project: Project) : Disposable {
     fun removeListener(listener: AnalysisListener) = listeners.remove(listener)
 
     fun analyzeFile(file: VirtualFile, force: Boolean = false): AnalysisResult? {
-        // Synchronous fast-path for cached results
         val cached = getCachedAnalysis(file)
-        if (!force && cached != null && cached.timestamp > System.currentTimeMillis() - 60000) {
+
+        // Freshness is judged by the file's modification stamp, not by wall
+        // clock. A time-based TTL meant any repeating UI timer re-triggered a
+        // full analysis the moment the TTL lapsed — a periodic freeze on an
+        // idle IDE, forever.
+        if (!force && cached != null && cached.modificationStamp == file.modificationStamp) {
             return cached
         }
-        
-        // Trigger async update if not forced (to keep UI responsive)
-        if (!force) {
-            analyzeFileAsync(file)
-            return cached // Return stale but immediate result
-        }
-        
-        return computeAnalysisSync(file)
+
+        // Always compute asynchronously (never on the caller's thread); a force simply
+        // bypasses the cache-freshness check above. Listeners are notified when done.
+        analyzeFileAsync(file)
+        return cached // Return stale but immediate result (may be null)
     }
+
+    /** Cache-only lookup for EDT callers (decorators, status bar, line markers). */
+    fun getCachedAnalysisOnly(file: VirtualFile): AnalysisResult? = getCachedAnalysis(file)
 
     fun analyzeFileAsync(file: VirtualFile) {
         if (!isEnabled || !pendingFiles.add(file.path)) return
@@ -130,41 +141,62 @@ class VestigeService(private val project: Project) : Disposable {
         .submit(analysisExecutor)
     }
 
+    /**
+     * Coalesced project-view refresh.
+     *
+     * This used to run every 500ms after any analysis. Combined with a
+     * decorator that kicked off analysis for uncached files, it formed a loop:
+     * refresh -> decorate -> analyze -> refresh. Once the LRU started evicting,
+     * the loop could not terminate. The decorator no longer schedules analysis,
+     * and this window is much wider.
+     */
     private fun scheduleProjectViewRefresh() {
+        if (!refreshPending.compareAndSet(false, true)) return
         refreshAlarm.cancelAllRequests()
         refreshAlarm.addRequest({
+            refreshPending.set(false)
             if (!project.isDisposed) {
                 com.intellij.ide.projectView.ProjectView.getInstance(project).refresh()
             }
-        }, 500) // Throttle refresh to every 500ms
+        }, PROJECT_VIEW_REFRESH_DELAY_MS)
     }
 
     private fun computeAnalysisSync(file: VirtualFile): AnalysisResult? {
-        val lastModified = file.modificationStamp
-        val cacheKey = "vestige.cache.${file.path}"
-        
+        // Captured up front: the result is only a valid cache entry for the
+        // version of the file it was actually computed from.
+        val stamp = file.modificationStamp
         val realTimeStats = computeRealTimeStats(file)
         val analyzer = project.getService(VestigeGitAnalyzer::class.java)
-        val stats = try { analyzer.analyzeFile(file) } catch (e: Exception) { null }
-        
+
+        // NOTE on the `catch` blocks below: ProcessCanceledException must be
+        // rethrown, never swallowed. Swallowing it makes this work
+        // uncancellable, which is what let a single analysis hold the read lock
+        // (and therefore block keystrokes) for its full duration.
+        val stats = runCancellable { analyzer.analyzeFile(file) }
+
         if (stats == null) {
             val result = AnalysisResult(
                 stats = null,
                 busFactor = null,
                 debt = calculateDebtFromContent(realTimeStats),
                 stability = calculateStabilityFromContent(realTimeStats),
+                modificationStamp = stamp,
                 realTimeStats = realTimeStats
             )
             analysisCache[file.path] = result
             return result
         }
-        
-        val busFactor = try { analyzer.calculateBusFactor(file) } catch (e: Exception) { null }
-        val debt = try { analyzer.calculateTechnicalDebt(file) } catch (e: Exception) { 0.0 }
+
+        ProgressManager.checkCanceled()
+        val busFactor = runCancellable { analyzer.calculateBusFactor(file) }
+        ProgressManager.checkCanceled()
+        val debt = runCancellable { analyzer.calculateTechnicalDebt(file) } ?: 0.0
         val stability = maxOf(0, 100 - (stats.commits * 2))
-        
-        val tour = try { analyzer.generateOnboardingTour(file) } catch (e: Exception) { null }
-        val recommendations = try { analyzer.generateOnboardingRecommendations(file) } catch (e: Exception) { null }
+
+        ProgressManager.checkCanceled()
+        val tour = runCancellable { analyzer.generateOnboardingTour(file) }
+        ProgressManager.checkCanceled()
+        val recommendations = runCancellable { analyzer.generateOnboardingRecommendations(file) }
         val narrative = buildString {
             append("The history of ${file.name} is a journey through ${stats.commits} iterations. ")
             if (busFactor != null && (busFactor.risk == "critical" || busFactor.risk == "high")) {
@@ -177,31 +209,43 @@ class VestigeService(private val project: Project) : Disposable {
         }
         
         val result = AnalysisResult(
-            stats, 
-            busFactor, 
-            debt, 
+            stats,
+            busFactor,
+            debt,
             stability,
             onboardingTour = tour,
             onboardingRecommendations = recommendations,
             onboardingNarrative = narrative,
+            modificationStamp = stamp,
             realTimeStats = realTimeStats
         )
         analysisCache[file.path] = result
-        props.setValue(cacheKey, lastModified.toString())
         return result
+    }
+
+    /**
+     * Run a git operation, tolerating failure but never hiding cancellation.
+     */
+    private inline fun <T> runCancellable(block: () -> T): T? = try {
+        block()
+    } catch (e: ProcessCanceledException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
     
     /**
      * Compute real-time statistics from file content (no git required)
      */
     private fun computeRealTimeStats(file: VirtualFile): RealTimeStats {
-        val document = FileDocumentManager.getInstance().getDocument(file)
-        val lineCount = document?.lineCount ?: 0
+        // Document access must happen under a read action (this is reentrant, so it is
+        // also safe when we are already inside ReadAction.nonBlocking).
+        val (lineCount, complexity) = ReadAction.compute<Pair<Int, Int>, RuntimeException> {
+            val document = FileDocumentManager.getInstance().getDocument(file)
+            Pair(document?.lineCount ?: 0, calculateComplexity(document))
+        }
         val fileSize = file.length
         val lastModified = file.modificationStamp
-        
-        // Calculate complexity (simple heuristic: lines + nesting)
-        val complexity = calculateComplexity(document)
         
         // Check if file has git history
         val hasGitHistory = try {

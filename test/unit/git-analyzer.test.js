@@ -1,6 +1,5 @@
 const assert = require('assert');
-const GitAnalyzer = require('../../git-analyzer');
-const vscode = require('vscode');
+const GitAnalyzer = require('../../dist/git-analyzer');
 
 suite('GitAnalyzer Unit Test Suite', () => {
     let analyzer;

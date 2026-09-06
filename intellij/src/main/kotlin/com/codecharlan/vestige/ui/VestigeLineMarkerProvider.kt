@@ -7,63 +7,79 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNameIdentifierOwner
+import com.intellij.psi.util.PsiTreeUtil
 
+/**
+ * Gutter icons summarising Vestige's view of the current file.
+ *
+ * [getLineMarkerInfo] is called on a daemon thread for *every* PSI element of
+ * every highlighting pass — thousands of calls per keystroke-triggered pass. It
+ * must be pure and allocation-light: cached lookups only, no git, no file I/O,
+ * no editor or document mutation, and no work scheduling.
+ */
 class VestigeLineMarkerProvider : LineMarkerProvider {
+
     override fun collectSlowLineMarkers(elements: List<PsiElement>, result: MutableCollection<in LineMarkerInfo<*>>) {
-        // Here we would implement the logic to show the Ghost Overlay HUD
-        // based on line interaction.
+        // Intentionally empty: this provider only produces per-element markers.
     }
+
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
-        // Only show for main identifiers (classes, functions) to avoid clutter
+        // Cheapest discriminators first, so the vast majority of elements are
+        // rejected before anything is resolved or looked up.
         if (element !is PsiNameIdentifierOwner) return null
-        
-        val file = element.containingFile.virtualFile ?: return null
-        
+        val nameIdentifier = element.nameIdentifier ?: return null
+
         val project = element.project
-        val service = project.getService(VestigeService::class.java)
-        val result = service.analyzeFile(file) ?: return null
+        if (project.isDisposed) return null
+
+        val file = element.containingFile?.virtualFile ?: return null
+
+        // Cache-only. The old version called `service.analyzeFile(file)`, which
+        // consults the cache TTL and schedules a background analysis on a miss —
+        // from a per-element hot path, so every highlighting pass over an
+        // uncached file queued redundant analyses. If there is nothing cached,
+        // render no marker; the pass that follows the analysis will draw it.
+        val service = project.getService(VestigeService::class.java) ?: return null
+        val result = service.getCachedAnalysis(file) ?: return null
+
         val stats = result.stats
         val realTime = result.realTimeStats
 
-        // Show Seance Presence HUD for top author
-        val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
-        if (editor != null && stats != null && stats.ownershipPercent > 30) {
-            val line = editor.document.getLineNumber(element.textOffset)
-            VestigeGhostOverlay(editor).showPresenceHUD(line, stats.topAuthor, stats.ownershipPercent)
-        }
-        
         // Select icon based on available data
         val (icon, tooltip) = when {
             stats != null -> {
                 when {
-                    stats.commits > 20 -> AllIcons.General.BalloonError to 
+                    stats.commits > 20 -> AllIcons.General.BalloonError to
                         "Vestige: High churn (${stats.commits} commits, ${stats.ageDays} days old)"
-                    stats.ageDays > 365 -> AllIcons.Actions.ListFiles to 
+                    stats.ageDays > 365 -> AllIcons.Actions.ListFiles to
                         "Vestige: Fossil code (${stats.ageDays} days old, ${stats.commits} commits)"
-                    stats.commits > 10 -> AllIcons.General.InspectionsOK to 
+                    stats.commits > 10 -> AllIcons.General.InspectionsOK to
                         "Vestige: Active file (${stats.commits} commits, ${stats.ageDays} days old)"
-                    else -> AllIcons.General.Information to 
+                    else -> AllIcons.General.Information to
                         "Vestige: Recent file (${stats.commits} commits, ${stats.ageDays} days old)"
                 }
             }
             realTime != null -> {
                 when {
-                    realTime.isNewFile -> AllIcons.General.Add to 
+                    realTime.isNewFile -> AllIcons.General.Add to
                         "Vestige: New file (${realTime.lineCount} lines, not in git)"
-                    realTime.complexity > 30 -> AllIcons.General.Warning to 
+                    realTime.complexity > 30 -> AllIcons.General.Warning to
                         "Vestige: Complex file (${realTime.lineCount} lines, complexity ${realTime.complexity})"
-                    realTime.lineCount > 500 -> AllIcons.Actions.ListFiles to 
+                    realTime.lineCount > 500 -> AllIcons.Actions.ListFiles to
                         "Vestige: Large file (${realTime.lineCount} lines)"
-                    else -> AllIcons.General.InspectionsOK to 
+                    else -> AllIcons.General.InspectionsOK to
                         "Vestige: ${realTime.lineCount} lines, ${realTime.codeHealth}"
                 }
             }
             else -> return null
         }
 
+        // Anchor on the leaf element of the name identifier, as required by the platform.
+        val anchor = PsiTreeUtil.getDeepestFirst(nameIdentifier)
+
         return LineMarkerInfo(
-            element,
-            element.textRange,
+            anchor,
+            anchor.textRange,
             icon,
             { tooltip },
             null,

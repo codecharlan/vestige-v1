@@ -1,57 +1,30 @@
 package com.codecharlan.vestige.ui
 
-import java.awt.*
-import java.awt.geom.Path2D
+import java.awt.BorderLayout
 import javax.swing.JPanel
-import kotlin.random.Random
 
-class VestigePulsePanel : JPanel() {
+/**
+ * Placeholder for the edit-activity heatmap, which is not implemented.
+ *
+ * The previous implementation drew a gradient-filled area chart from
+ * `Random(42)` — twenty fabricated data points, seeded so they looked stable
+ * across repaints, with six more random dots labelled "ghost trails" and a
+ * neon stroke on top. It was a chart of nothing that a reader would reasonably
+ * take for real activity data, which is worse than showing no chart at all.
+ *
+ * It now says what the feature would be and that the data is not collected.
+ */
+class VestigePulsePanel : JPanel(BorderLayout()) {
+
     init {
-        isOpaque = false
-        preferredSize = Dimension(300, 200)
-    }
-
-    override fun paintComponent(g: Graphics) {
-        val g2 = g as Graphics2D
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-
-        val w = width.toDouble()
-        val h = height.toDouble()
-
-        // Draw Heatmap (Simulated for parity)
-        val path = Path2D.Double()
-        path.moveTo(0.0, h)
-        
-        val segments = 20
-        val rnd = Random(42)
-        for (i in 1..segments) {
-            val x = (i * w) / segments
-            val y = h - (rnd.nextDouble() * h * 0.8)
-            path.lineTo(x, y)
-        }
-        path.lineTo(w, h)
-        path.closePath()
-
-        // Gradient for the heatmap
-        val gradient = LinearGradientPaint(
-            0f, 0f, 0f, h.toFloat(),
-            floatArrayOf(0f, 1f),
-            arrayOf(VestigeUI.Purple, Color(0, 0, 0, 0))
+        background = VestigeUI.Surface
+        isOpaque = true
+        add(
+            VestigeUI.emptyState(
+                "Edit activity is not tracked yet",
+                "A heatmap of when this file is edited needs per-session history that Vestige does not record."
+            ),
+            BorderLayout.CENTER
         )
-        g2.paint = gradient
-        g2.fill(path)
-
-        // Draw "Ghost Trails" (Simulated points)
-        g2.color = VestigeUI.Pink
-        for (i in 0..5) {
-            val ex = rnd.nextDouble() * w
-            val ey = rnd.nextDouble() * h
-            g2.fillOval(ex.toInt(), ey.toInt(), 4, 4)
-        }
-        
-        // Neon Glow effect (simplified)
-        g2.stroke = BasicStroke(2f)
-        g2.color = VestigeUI.Blue
-        g2.draw(path)
     }
 }

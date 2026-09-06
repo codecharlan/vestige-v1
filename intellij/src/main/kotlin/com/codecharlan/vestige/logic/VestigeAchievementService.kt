@@ -1,9 +1,11 @@
 package com.codecharlan.vestige.logic
 
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 
 @Service(Service.Level.PROJECT)
 class VestigeAchievementService(private val project: Project) {
@@ -46,8 +48,26 @@ class VestigeAchievementService(private val project: Project) {
             if (achievement.id == id && count >= achievement.requirement && !unlocked.contains(achievement.id)) {
                 unlocked.add(achievement.id)
                 properties.setList("vestige.unlocked", unlocked)
-                Messages.showInfoMessage(project, "🎉 Achievement Unlocked: ${achievement.displayName}", "Vestige")
+                notifyUnlocked(achievement)
             }
+        }
+    }
+
+    /**
+     * Shows a non-modal balloon notification, always on the EDT (this service can be
+     * called from background analysis threads).
+     */
+    private fun notifyUnlocked(achievement: Achievement) {
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            NotificationGroupManager.getInstance()
+                .getNotificationGroup("VestigeNotifications")
+                .createNotification(
+                    "Vestige",
+                    "🎉 Achievement Unlocked: ${achievement.displayName}",
+                    NotificationType.INFORMATION
+                )
+                .notify(project)
         }
     }
 

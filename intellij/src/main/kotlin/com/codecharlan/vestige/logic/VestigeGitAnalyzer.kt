@@ -3,17 +3,22 @@ package com.codecharlan.vestige.logic
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.errors.GitAPIException
 import org.eclipse.jgit.diff.DiffEntry
 import org.eclipse.jgit.lib.ObjectId
+import org.eclipse.jgit.lib.ObjectReader
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
 import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.treewalk.AbstractTreeIterator
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
+import org.eclipse.jgit.treewalk.TreeWalk
 import org.eclipse.jgit.treewalk.filter.PathFilter
 import com.intellij.openapi.vfs.VirtualFileManager
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
@@ -38,6 +43,97 @@ private fun File.toVirtualFile(project: Project) =
 @Service(Service.Level.PROJECT)
 class VestigeGitAnalyzer(private val project: Project) : Disposable {
 
+    private val log = Logger.getInstance(VestigeGitAnalyzer::class.java)
+
+    companion object {
+        /**
+         * Hard cap on commits walked for a single file's history.
+         *
+         * Every one of these walks is reached from `VestigeService.computeAnalysisSync`,
+         * i.e. on every editor tab switch and every save, so an unbounded
+         * O(all commits) walk here is felt directly as IDE sluggishness. For a
+         * file with more than this many commits the reported `commits` count and
+         * `ageDays` describe the most recent [MAX_FILE_HISTORY_COMMITS] commits
+         * rather than the whole history — a bounded approximation is preferred
+         * over an unbounded walk.
+         */
+        private const val MAX_FILE_HISTORY_COMMITS = 500
+
+        /** Cap on commits walked for project-wide (not per-file) history scans. */
+        private const val MAX_PROJECT_COMMITS = 500
+
+        /** Commits inspected when computing change-coupling for one file. */
+        private const val MAX_COUPLING_COMMITS = 20
+
+        /** Cap on diff entries read out of a single commit. */
+        private const val MAX_DIFF_ENTRIES_PER_COMMIT = 500
+
+        /** Commits scanned when looking for deleted files. */
+        private const val MAX_DELETED_SCAN_COMMITS = 50
+
+        /** Cap on reported deleted files. */
+        private const val MAX_DELETED_RESULTS = 100
+
+        /**
+         * Cap on files examined by the project-wide per-file scans
+         * ([detectZombieCode] / [detectHotPotato]). Each examined file costs its
+         * own history walk, so this bounds an O(files x commits) product.
+         */
+        private const val MAX_SCANNED_TREE_FILES = 300
+
+        /** Wall-clock budget for the project-wide per-file scans. */
+        private const val SCAN_BUDGET_MS = 5_000L
+
+        /** Files larger than this are not read into memory for line counting. */
+        private const val MAX_TEXT_BYTES = 1L * 1024 * 1024
+
+        /** Directories never descended into by tree scans. */
+        private val SKIP_DIRS = setOf(
+            "node_modules", "build", "out", "dist", "target",
+            "vendor", "__pycache__", ".gradle"
+        )
+
+        // Compiled once. Each of these was previously constructed inside a
+        // per-commit or per-message loop body.
+        // Matched with containsMatchIn, not matches(): commit messages are
+        // multiline and "." does not cross newlines.
+        private val RE_BUGFIX_MESSAGE = Regex("(?i)\\b(fix|bug|issue|error|crash)\\b")
+        private val RE_REFACTOR_MESSAGE =
+            Regex("(?i)\\b(refactor|restructure|rewrite|extract|cleanup|clean-up|simplify)\\b")
+        private val RE_VERSION_TAG = Regex("v\\d")
+        private val RE_AT_VERSION = Regex("@\\d")
+        private val RE_NON_WORD = Regex("[^a-z0-9]")
+
+        private val KEYWORD_STOP_WORDS = setOf(
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of",
+            "with", "by", "from", "up", "about", "into", "over", "after", "fix", "chore",
+            "feat", "docs", "style", "refactor", "perf", "test", "merge", "branch"
+        )
+    }
+
+    /** True when [path] lies inside a directory that tree scans skip. */
+    private fun isSkippedPath(path: String): Boolean =
+        path.splitToSequence('/').any { it in SKIP_DIRS || (it.startsWith(".") && it != "." && it != "..") }
+
+    /**
+     * Returns the repo-relative path of [file] (with '/' separators), or null when the
+     * file is not located under the repository's working tree.
+     */
+    private fun relativizePath(repo: Repository, file: VirtualFile): String? {
+        val workTree = repo.directory.parentFile ?: return null
+        return try {
+            val repoPath = workTree.toPath().toAbsolutePath().normalize()
+            val filePath = java.nio.file.Paths.get(file.path).toAbsolutePath().normalize()
+            if (!filePath.startsWith(repoPath)) return null
+            val relative = repoPath.relativize(filePath).toString().replace(File.separatorChar, '/')
+            relative.ifEmpty { null }
+        } catch (e: ProcessCanceledException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     data class FileStats(
         val commits: Int,
         val ageDays: Int,
@@ -49,32 +145,59 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
 
     private val gitCache = ConcurrentHashMap<String, Git>()
 
+    /**
+     * Directory path -> resolved repository root.
+     *
+     * Without this, every call re-probed the filesystem (`File.exists` +
+     * `isDirectory` per parent level) before it ever consulted [gitCache].
+     * Some call paths reach this from the EDT, so the probe is on a latency path.
+     */
+    private val repoRootCache = ConcurrentHashMap<String, String>()
+
     override fun dispose() {
         gitCache.values.forEach { git ->
             try {
                 git.repository.close()
                 git.close()
             } catch (e: Exception) {
-                // Ignore close errors
+                // Ignore close errors. Deliberately NOT rethrowing
+                // ProcessCanceledException here: nothing inside is cancellable,
+                // and letting anything escape would abandon the remaining
+                // repositories unclosed.
             }
         }
         gitCache.clear()
+        repoRootCache.clear()
     }
 
     private fun getGitRepo(file: VirtualFile): Git? {
         val projectBase = project.basePath ?: return null
-        
+        val startDir = File(file.path).parentFile
+
+        // Fast path: cache lookup BEFORE any filesystem probing. The repo root
+        // for this directory is already known and its Git instance is live.
+        if (startDir != null) {
+            repoRootCache[startDir.path]?.let { root -> gitCache[root]?.let { return it } }
+        }
+
         // Search up from the file's location to find the nearest .git directory
-        var current: File? = File(file.path).parentFile
-        while (current != null && current.path.startsWith(projectBase)) {
+        var cursor: File? = startDir
+        while (cursor != null && cursor.path.startsWith(projectBase)) {
+            ProgressManager.checkCanceled()
+            val current: File = cursor
+
+            // Consult the cache at each level before touching the filesystem.
+            val cachedAtLevel = gitCache[current.absolutePath]
+            if (cachedAtLevel != null) {
+                startDir?.let { repoRootCache[it.path] = current.absolutePath }
+                return cachedAtLevel
+            }
+
             val gitDir = File(current, ".git")
             if (gitDir.exists() && gitDir.isDirectory) {
                 val repoRoot = current.absolutePath
-                
-                // Check cache first
-                val cached = gitCache[repoRoot]
-                if (cached != null) return cached
-                
+                startDir?.let { repoRootCache[it.path] = repoRoot }
+
                 // Try to create new instance
                 val newGit = try {
                     val repository = FileRepositoryBuilder()
@@ -82,6 +205,8 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
                         .readEnvironment()
                         .build()
                     Git(repository)
+                } catch (e: ProcessCanceledException) {
+                    throw e
                 } catch (e: Exception) {
                     null
                 }
@@ -95,9 +220,9 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
                     return newGit
                 }
             }
-            current = current.parentFile
+            cursor = current.parentFile
         }
-        
+
         // Fallback: check project root
         val cached = gitCache[projectBase]
         if (cached != null) return cached
@@ -109,6 +234,8 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
                 .findGitDir()
                 .build()
             Git(repository)
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             null
         }
@@ -125,46 +252,72 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
         return null
     }
 
+    /**
+     * The commits touching [filePath], newest first, bounded to [max].
+     *
+     * Every history read in this class funnels through here so that no walk can
+     * be unbounded. `setMaxCount` installs JGit's `MaxCountRevFilter`, which
+     * aborts the walk (via `StopWalkException`) once the limit is reached rather
+     * than merely truncating the result.
+     */
+    private fun fileHistory(
+        git: Git,
+        filePath: String,
+        max: Int = MAX_FILE_HISTORY_COMMITS
+    ): List<RevCommit> {
+        ProgressManager.checkCanceled()
+        val commits = ArrayList<RevCommit>(minOf(max, 64))
+        for (commit in git.log().addPath(filePath).setMaxCount(max).call()) {
+            ProgressManager.checkCanceled()
+            commits.add(commit)
+            if (commits.size >= max) break
+        }
+        return commits
+    }
+
+    /** Derives [FileStats] from an already-bounded, newest-first commit list. */
+    private fun statsFrom(commits: List<RevCommit>): FileStats? {
+        if (commits.isEmpty()) return null
+
+        val firstCommit = commits.last()
+        val lastCommit = commits.first()
+        val ageDays = ChronoUnit.DAYS.between(
+            Instant.ofEpochMilli(firstCommit.commitTime.toLong() * 1000)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate(),
+            LocalDate.now()
+        ).toInt()
+
+        val authors = HashMap<String, Int>()
+        for (commit in commits) {
+            ProgressManager.checkCanceled()
+            val name = commit.authorIdent.name
+            authors[name] = (authors[name] ?: 0) + 1
+        }
+        val top = authors.maxByOrNull { it.value }
+        val topAuthor = top?.key ?: "Unknown"
+        val ownershipPercent = ((top?.value ?: 0).toDouble() / commits.size * 100).toInt()
+
+        return FileStats(
+            commits = commits.size,
+            ageDays = ageDays,
+            topAuthor = topAuthor,
+            ownershipPercent = ownershipPercent,
+            lastModifiedDate = Date(lastCommit.commitTime.toLong() * 1000L)
+        )
+    }
+
     fun analyzeFile(file: VirtualFile, force: Boolean = false): FileStats? {
         val git = getGitRepo(file) ?: return null
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
-        
-        
+        val filePath = relativizePath(repo, file) ?: return null
+
         // Removed internal cache check to prevent memory leak and redundancy
 
         return try {
-            val log = git.log()
-                .addPath(filePath)
-                .call()
-                .toList()
-
-            if (log.isEmpty()) {
-                return null
-            }
-
-            val now = System.currentTimeMillis()
-            val firstCommit = log.last()
-            val lastCommit = log.first()
-            val ageDays = ChronoUnit.DAYS.between(
-                Instant.ofEpochMilli(firstCommit.commitTime.toLong() * 1000).atZone(ZoneId.systemDefault()).toLocalDate(),
-                LocalDate.now()
-            ).toInt()
-
-            val authors = log.groupBy { it.authorIdent.name }
-            val topAuthor = authors.maxByOrNull { it.value.size }?.key ?: "Unknown"
-            val authorCommits = authors[topAuthor]?.size ?: 0
-            val ownershipPercent = (authorCommits.toDouble() / log.size * 100).toInt()
-
-            val stats = FileStats(
-                commits = log.size,
-                ageDays = ageDays,
-                topAuthor = topAuthor,
-                ownershipPercent = ownershipPercent,
-                lastModifiedDate = Date(lastCommit.commitTime.toLong() * 1000L)
-            )
-
-            stats
+            statsFrom(fileHistory(git, filePath))
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             null
         }
@@ -196,16 +349,86 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
         val risk: String
     )
 
-    private fun prepareTreeParser(repository: Repository, objectId: String): AbstractTreeIterator {
-        val walk = RevWalk(repository)
-        val commit = walk.parseCommit(repository.resolve(objectId))
-        val tree = commit.tree ?: throw IllegalStateException("No tree found for commit $objectId")
-        val reader = repository.newObjectReader()
-        return CanonicalTreeParser().apply {
-            this.reset(reader, tree)
+    /**
+     * A repository read session: one [RevWalk] and one [ObjectReader] shared by
+     * every commit an operation touches.
+     *
+     * This replaces the previous `prepareTreeParser`, which had two defects.
+     * First, it returned a [CanonicalTreeParser] created *inside*
+     * `newObjectReader().use { }`, so the reader was closed before the diff ever
+     * consumed the parser — a use-after-close that only appeared to work because
+     * `reset()` preloads the top-level tree, and that broke as soon as a
+     * recursive diff called `createSubtreeIterator`. Second, it allocated a
+     * fresh RevWalk *and* ObjectReader on every call, twice per commit.
+     */
+    private class RepoSession(repo: Repository) : AutoCloseable {
+        val reader: ObjectReader = repo.newObjectReader()
+        val walk: RevWalk = RevWalk(reader)
+
+        /** Tree iterator for [id]'s commit tree, valid for this session's lifetime. */
+        fun treeParser(repo: Repository, id: ObjectId): AbstractTreeIterator {
+            val commit = walk.parseCommit(id)
+            return CanonicalTreeParser().apply { reset(reader, commit.tree) }
+        }
+
+        override fun close() {
+            // RevWalk(ObjectReader) does not own the reader, so close both.
+            walk.close()
+            reader.close()
         }
     }
-    
+
+    /**
+     * Paths changed by [commit] relative to its first parent, capped at
+     * [MAX_DIFF_ENTRIES_PER_COMMIT]. Uses the session's shared reader and the
+     * commit's already-known parent instead of re-resolving `"<hash>~1"`.
+     */
+    private fun changedPaths(repo: Repository, session: RepoSession, commit: RevCommit): List<String> {
+        ProgressManager.checkCanceled()
+        val parsed = session.walk.parseCommit(commit.id)
+        if (parsed.parentCount == 0) return emptyList() // root commit: no parent to diff
+
+        val parentTree = session.treeParser(repo, parsed.getParent(0).id)
+        val commitTree = session.treeParser(repo, parsed.id)
+
+        val paths = ArrayList<String>()
+        TreeWalk(session.reader).use { tw ->
+            tw.addTree(parentTree)
+            tw.addTree(commitTree)
+            tw.isRecursive = true
+            tw.filter = org.eclipse.jgit.treewalk.filter.TreeFilter.ANY_DIFF
+            while (tw.next()) {
+                ProgressManager.checkCanceled()
+                paths.add(tw.pathString)
+                if (paths.size >= MAX_DIFF_ENTRIES_PER_COMMIT) break
+            }
+        }
+        return paths
+    }
+
+    /**
+     * Like [changedPaths] but retains change types, for callers that need to
+     * distinguish a delete from a modify. Also capped at
+     * [MAX_DIFF_ENTRIES_PER_COMMIT] and uses the session's shared reader.
+     */
+    private fun diffEntries(repo: Repository, session: RepoSession, commit: RevCommit): List<DiffEntry> {
+        ProgressManager.checkCanceled()
+        val parsed = session.walk.parseCommit(commit.id)
+        if (parsed.parentCount == 0) return emptyList()
+
+        val parentTree = session.treeParser(repo, parsed.getParent(0).id)
+        val commitTree = session.treeParser(repo, parsed.id)
+
+        TreeWalk(session.reader).use { tw ->
+            tw.addTree(parentTree)
+            tw.addTree(commitTree)
+            tw.isRecursive = true
+            tw.filter = org.eclipse.jgit.treewalk.filter.TreeFilter.ANY_DIFF
+            return DiffEntry.scan(tw).take(MAX_DIFF_ENTRIES_PER_COMMIT)
+        }
+    }
+
+
     private fun calculateActualBusFactor(contributors: List<Contributor>): Int {
         var total = 0
         contributors.forEachIndexed { index, contributor ->
@@ -282,21 +505,19 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
     fun getFileHistory(file: VirtualFile, count: Int = 20): List<CommitInfo> {
         val git = getGitRepo(file) ?: return emptyList()
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
+        val filePath = relativizePath(repo, file) ?: return emptyList()
 
         return try {
-            git.log()
-                .addPath(filePath)
-                .setMaxCount(count)
-                .call()
-                .map { commit ->
-                    CommitInfo(
-                        hash = commit.name,
-                        author = commit.authorIdent.name,
-                        date = Date(commit.commitTime * 1000L),
-                        message = commit.shortMessage
-                    )
-                }
+            fileHistory(git, filePath, minOf(count, MAX_FILE_HISTORY_COMMITS)).map { commit ->
+                CommitInfo(
+                    hash = commit.name,
+                    author = commit.authorIdent.name,
+                    date = Date(commit.commitTime * 1000L),
+                    message = commit.shortMessage
+                )
+            }
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             emptyList()
         }
@@ -305,56 +526,35 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
     fun getFileStats(file: VirtualFile): FileStats? {
         val git = getGitRepo(file) ?: return null
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
+        val filePath = relativizePath(repo, file) ?: return null
 
         return try {
-            val log = git.log()
-                .addPath(filePath)
-                .call()
-                .toList()
-
-            if (log.isEmpty()) {
-                return null
-            }
-
-            val firstCommit = log.last()
-            val lastCommit = log.first()
-            
-            // Calculate age in days
-            val ageDays = ChronoUnit.DAYS.between(
-                Instant.ofEpochMilli(firstCommit.commitTime.toLong() * 1000)
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDate(),
-                LocalDate.now()
-            ).toInt()
-
-            // Calculate author statistics
-            val authors = log.groupBy { it.authorIdent.name }
-            val topAuthor = authors.maxByOrNull { it.value.size }?.key ?: "Unknown"
-            val authorCommits = authors[topAuthor]?.size ?: 0
-            val ownershipPercent = (authorCommits.toDouble() / log.size * 100).toInt()
-
-            FileStats(
-                commits = log.size,
-                ageDays = ageDays,
-                topAuthor = topAuthor,
-                ownershipPercent = ownershipPercent,
-                lastModifiedDate = Date(lastCommit.commitTime.toLong() * 1000L)
-            )
+            statsFrom(fileHistory(git, filePath))
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             null
         }
-
     }
 
     fun calculateTechnicalDebt(file: VirtualFile): Double {
         val stats = getFileStats(file) ?: return 0.0
-        val lineCount = try { 
-            String(file.contentsToByteArray()).lines().size 
-        } catch (e: Exception) { 
-            100 
+        // Skip reading very large files entirely: the old version materialized the
+        // whole file as a String plus a List of every line just to count them.
+        val lineCount = if (file.length > MAX_TEXT_BYTES) {
+            (file.length / 40).toInt().coerceAtLeast(1) // ~40 bytes/line estimate
+        } else {
+            try {
+                var lines = 1
+                for (b in file.contentsToByteArray()) if (b == '\n'.code.toByte()) lines++
+                lines
+            } catch (e: ProcessCanceledException) {
+                throw e
+            } catch (e: Exception) {
+                100
+            }
         }
-        
+
         val complexityFactor = lineCount / 100.0
         val churnFactor = max(1.0, stats.commits / 5.0)
         val ageFactor = max(1.0, stats.ageDays / 30.0)
@@ -365,46 +565,26 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
     fun calculateBusFactor(file: VirtualFile): BusFactorInfo {
         val git = getGitRepo(file) ?: return BusFactorInfo(0, emptyList(), "unknown")
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
+        val filePath = relativizePath(repo, file) ?: return BusFactorInfo(0, emptyList(), "unknown")
         
         return try {
-            // Get the commit history for the file
-            val log = git.log()
-                .addPath(filePath)
-                .call()
-                .toList()
-                
-            if (log.isEmpty()) {
+            // Bounded history: this is called from computeAnalysisSync on every
+            // tab switch, so it must never walk an entire repository.
+            val history = fileHistory(git, filePath)
+
+            if (history.isEmpty()) {
                 return BusFactorInfo(0, emptyList(), "no_commits")
             }
-            
+
             // Group commits by author
-            val authors = log.groupBy { it.authorIdent.name }
-            val totalCommits = log.size
-            
-            // Calculate contributions per author
+            val authors = history.groupBy { it.authorIdent.name }
+            val totalCommits = history.size
+
+            // Ownership is approximated by commit count per author for this file.
+            // (Previously this ran a tree-diff per commit, which was O(commits) diffs.)
             val contributors = authors.map { (name, commits) ->
-                val lines = commits.flatMap { commit -> 
-                    try {
-                        git.diff()
-                            .setOldTree(prepareTreeParser(repo, "${commit.name}~1"))
-                            .setNewTree(prepareTreeParser(repo, commit.name))
-                            .setPathFilter(PathFilter.create(filePath))
-                            .call()
-                            .mapNotNull { diffEntry -> 
-                                // Only count added lines
-                                if (diffEntry.changeType == DiffEntry.ChangeType.ADD) {
-                                    diffEntry.newId.name()
-                                } else null
-                            }
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                }.size
-                
-                // Calculate percentage of commits by this author
                 val commitPercentage = (commits.size * 100) / totalCommits
-                Contributor(name, lines, commitPercentage)
+                Contributor(name, commits.size, commitPercentage)
             }.sortedByDescending { it.percent }
             
             // Calculate bus factor
@@ -420,9 +600,11 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
             
             // Return top 5 contributors
             BusFactorInfo(busFactor, contributors.take(5), risk)
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             // Log the error and return unknown status
-            println("Error calculating bus factor: ${e.message}")
+            log.warn("Error calculating bus factor: ${e.message}", e)
             BusFactorInfo(0, emptyList(), "error")
         }
     }
@@ -431,46 +613,47 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
     fun getCoupledFiles(file: VirtualFile): List<CouplingInfo> {
         val git = getGitRepo(file) ?: return emptyList()
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
-        
+        val filePath = relativizePath(repo, file) ?: return emptyList()
+
         return try {
-            // Get the commit history for the file (last 20 commits)
-            val commits = git.log()
-                .addPath(filePath)
-                .setMaxCount(20)
-                .call()
-                .toList()
-                
-            if (commits.isEmpty()) {
-                return emptyList()
-            }
-            
+            val commits = fileHistory(git, filePath, MAX_COUPLING_COMMITS)
+            if (commits.isEmpty()) return emptyList()
+
             val fileCounts = mutableMapOf<String, Int>()
-            
-            // For each commit, get the list of changed files
-            for (commit in commits) {
-                val diff = git.diff()
-                    .setOldTree(prepareTreeParser(repo, "${commit.name}~1"))
-                    .setNewTree(prepareTreeParser(repo, commit.name))
-                    .call()
-                    
-                diff.forEach { diffEntry ->
-                    val changedFile = diffEntry.newPath
-                    if (changedFile.isNotEmpty() && changedFile != filePath) {
-                        fileCounts[changedFile] = (fileCounts[changedFile] ?: 0) + 1
+
+            // ONE RevWalk + ONE ObjectReader for all commits. The old version
+            // allocated both twice per commit (via prepareTreeParser) and
+            // re-resolved "<hash>~1" each time.
+            RepoSession(repo).use { session ->
+                for (commit in commits) {
+                    ProgressManager.checkCanceled()
+                    val changed = try {
+                        changedPaths(repo, session, commit)
+                    } catch (e: ProcessCanceledException) {
+                        throw e
+                    } catch (e: Exception) {
+                        continue // unreadable commit; skip it
+                    }
+
+                    for (changedFile in changed) {
+                        if (changedFile.isNotEmpty() && changedFile != filePath) {
+                            fileCounts[changedFile] = (fileCounts[changedFile] ?: 0) + 1
+                        }
                     }
                 }
             }
-            
+
             // Return top 3 most frequently changed files with this one
             fileCounts.entries
                 .sortedByDescending { it.value }
                 .take(3)
-                .map { (file, count) -> 
-                    CouplingInfo(file, count, (count * 100 / commits.size)) 
+                .map { (path, count) ->
+                    CouplingInfo(path, count, (count * 100 / commits.size))
                 }
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            println("Error finding coupled files: ${e.message}")
+            log.warn("Error finding coupled files: ${e.message}", e)
             emptyList()
         }
     }
@@ -482,19 +665,17 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
         val git = getGitRepo(vFile) ?: return emptyList()
         
         return try {
-            // Get the commit history (last 500 commits)
-            val commits = git.log()
-                .setMaxCount(500)
-                .call()
-                .toList()
-                .map { commit ->
-                    val date = Instant.ofEpochMilli(commit.commitTime.toLong() * 1000)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate()
-                    val message = commit.fullMessage.trim()
-                    date to message
-                }
-                .sortedBy { it.first } // Sort by date ascending
+            // Bounded to MAX_PROJECT_COMMITS commits
+            val commits = ArrayList<Pair<LocalDate, String>>()
+            for (commit in git.log().setMaxCount(MAX_PROJECT_COMMITS).call()) {
+                ProgressManager.checkCanceled()
+                val date = Instant.ofEpochMilli(commit.commitTime.toLong() * 1000)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
+                commits.add(date to commit.fullMessage.trim())
+                if (commits.size >= MAX_PROJECT_COMMITS) break
+            }
+            commits.sortBy { it.first } // Sort by date ascending
 
             if (commits.size < 2) return emptyList()
 
@@ -516,9 +697,10 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
             val commitMessages = mutableListOf<String>()
 
             for (i in timeDiffs.indices) {
+                ProgressManager.checkCanceled()
                 currentEpochCommits++
                 commitMessages.add(commits[i].second)
-                
+
                 if (timeDiffs[i] > threshold) {
                     val period = "${currentEpochStart} to ${commits[i].first}"
                     val keywords = extractKeywords(commitMessages)
@@ -547,8 +729,10 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
             }
 
             epochs
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            println("Error detecting epochs: ${e.message}")
+            log.warn("Error detecting epochs: ${e.message}", e)
             emptyList()
         }
     }
@@ -566,34 +750,55 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
     // Elite: Advanced Specialized Methods
     fun findDeletedFiles(): List<Map<String, String>> {
         val git = getGitRepo(project.basePath?.let { File(it).toVirtualFile(project) } ?: return emptyList()) ?: return emptyList()
-        
+        val repo = git.repository
+
         return try {
-            // Get the log of deleted files
-            val logs = git.log()
-                .setMaxCount(50)
-                .call()
-                .flatMap { commit ->
-                    val diffs = git.diff()
-                        .setOldTree(prepareTreeParser(git.repository, "${commit.name}~1"))
-                        .setNewTree(prepareTreeParser(git.repository, commit.name))
-                        .call()
-                    
-                    diffs.filter { it.changeType == DiffEntry.ChangeType.DELETE }.map { diff ->
-                        mapOf(
-                            "hash" to commit.name,
-                            "author" to commit.authorIdent.name,
-                            "date" to Instant.ofEpochMilli(commit.commitTime.toLong() * 1000)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                                .toString(),
-                            "file" to diff.oldPath
+            val results = mutableListOf<Map<String, String>>()
+            val seen = HashSet<String>()
+
+            // Caps: MAX_DELETED_SCAN_COMMITS commits, MAX_DELETED_RESULTS files,
+            // MAX_DIFF_ENTRIES_PER_COMMIT entries per commit, one shared reader.
+            RepoSession(repo).use { session ->
+                var scanned = 0
+                for (commit in git.log().setMaxCount(MAX_DELETED_SCAN_COMMITS).call()) {
+                    ProgressManager.checkCanceled()
+                    if (scanned++ >= MAX_DELETED_SCAN_COMMITS || results.size >= MAX_DELETED_RESULTS) break
+
+                    val entries = try {
+                        diffEntries(repo, session, commit)
+                    } catch (e: ProcessCanceledException) {
+                        throw e
+                    } catch (e: Exception) {
+                        continue // root or unreadable commit
+                    }
+
+                    val date = Instant.ofEpochMilli(commit.commitTime.toLong() * 1000)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                        .toString()
+
+                    for (diff in entries) {
+                        if (diff.changeType != DiffEntry.ChangeType.DELETE) continue
+                        if (isSkippedPath(diff.oldPath)) continue
+                        if (!seen.add(diff.oldPath)) continue
+                        results.add(
+                            mapOf(
+                                "hash" to commit.name,
+                                "author" to commit.authorIdent.name,
+                                "date" to date,
+                                "file" to diff.oldPath
+                            )
                         )
+                        if (results.size >= MAX_DELETED_RESULTS) break
                     }
                 }
-            
-            logs.distinctBy { it["file"] } // Remove duplicates
+            }
+
+            results
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            println("Error finding deleted files: ${e.message}")
+            log.warn("Error finding deleted files: ${e.message}", e)
             emptyList()
         }
     }
@@ -601,31 +806,27 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
     fun findBugPatterns(file: VirtualFile): Map<String, Any>? {
         val git = getGitRepo(file) ?: return null
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
-        
+        val filePath = relativizePath(repo, file) ?: return null
+
         return try {
-            // Get commit messages for the file
-            val logs = git.log()
-                .addPath(filePath)
-                .call()
-                .map { it.fullMessage.trim() }
-            
-            if (logs.isEmpty()) return null
-            
-            val bugKeywords = listOf("fix", "bug", "issue", "error", "crash")
-            val bugCommits = logs.filter { msg -> 
-                bugKeywords.any { keyword -> 
-                    msg.contains(keyword, ignoreCase = true) 
-                } 
+            val history = fileHistory(git, filePath)
+            if (history.isEmpty()) return null
+
+            var bugCount = 0
+            for (commit in history) {
+                ProgressManager.checkCanceled()
+                if (RE_BUGFIX_MESSAGE.containsMatchIn(commit.fullMessage)) bugCount++
             }
-            
+
             mapOf(
-                "bugCount" to bugCommits.size,
-                "totalCommits" to logs.size,
-                "density" to if (logs.isNotEmpty()) bugCommits.size.toDouble() / logs.size else 0.0
+                "bugCount" to bugCount,
+                "totalCommits" to history.size,
+                "density" to bugCount.toDouble() / history.size
             )
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            println("Error finding bug patterns: ${e.message}")
+            log.warn("Error finding bug patterns: ${e.message}", e)
             null
         }
     }
@@ -634,27 +835,37 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
         val git = getGitRepo(project.basePath?.let { File(it).toVirtualFile(project) } ?: return emptyList()) ?: return emptyList()
         
         return try {
-            // Get all files in the repository
-            val fileTreeWalk = git.repository.let { repo ->
-                val treeWalk = org.eclipse.jgit.treewalk.TreeWalk(repo)
-                treeWalk.addTree(repo.resolve(org.eclipse.jgit.lib.Constants.HEAD))
-                treeWalk.isRecursive = true
-                treeWalk
-            }
-            
             val zombies = mutableListOf<Map<String, Any>>()
             val oneYearAgo = System.currentTimeMillis() - (365L * 24 * 60 * 60 * 1000)
-            
-            // Check each file's last modification time
-            while (fileTreeWalk.next() && zombies.size < 50) {
-                val path = fileTreeWalk.pathString
-                if (!fileTreeWalk.isSubtree) {
+            val deadline = System.currentTimeMillis() + SCAN_BUDGET_MS
+            var examined = 0
+
+            // Walk files at HEAD. Each examined file costs its own history walk,
+            // so the file count is capped (MAX_SCANNED_TREE_FILES) in addition
+            // to the result count, and the whole scan has a wall-clock budget.
+            // The old `zombies.size < 50` bound did not limit the loop at all:
+            // a repo with no zombies scanned every file.
+            TreeWalk(git.repository).use { fileTreeWalk ->
+                fileTreeWalk.addTree(git.repository.resolve(org.eclipse.jgit.lib.Constants.HEAD))
+                fileTreeWalk.isRecursive = true
+
+                while (fileTreeWalk.next()) {
+                    ProgressManager.checkCanceled()
+                    if (zombies.size >= 50) break
+                    if (examined >= MAX_SCANNED_TREE_FILES) break
+                    if (System.currentTimeMillis() > deadline) break
+
+                    if (fileTreeWalk.isSubtree) continue
+                    val path = fileTreeWalk.pathString
+                    if (isSkippedPath(path)) continue
+                    examined++
+
                     val lastCommit = git.log()
                         .addPath(path)
                         .setMaxCount(1)
                         .call()
                         .firstOrNull()
-                    
+
                     // If the file hasn't been modified in over a year, it's a zombie
                     lastCommit?.let { commit ->
                         val lastModified = commit.commitTime * 1000L
@@ -669,79 +880,109 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
                     }
                 }
             }
-            
+
             zombies.sortedByDescending { it["ageDays"] as Long }
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            println("Error detecting zombie code: ${e.message}")
+            log.warn("Error detecting zombie code: ${e.message}", e)
             emptyList()
         }
     }
 
     fun detectHotPotato(): List<Map<String, Any>> {
         val git = getGitRepo(project.basePath?.let { File(it).toVirtualFile(project) } ?: return emptyList()) ?: return emptyList()
-        
+
         return try {
-            // Get all files in the repository
-            val fileTreeWalk = git.repository.let { repo ->
-                val treeWalk = org.eclipse.jgit.treewalk.TreeWalk(repo)
-                treeWalk.addTree(repo.resolve(org.eclipse.jgit.lib.Constants.HEAD))
-                treeWalk.isRecursive = true
-                treeWalk
-            }
-            
             val hotPotatoes = mutableListOf<Map<String, Any>>()
-            
-            // Check each file's author count
-            while (fileTreeWalk.next() && hotPotatoes.size < 30) {
-                val path = fileTreeWalk.pathString
-                if (!fileTreeWalk.isSubtree) {
-                    // Get all commits for this file
-                    val commits = git.log()
-                        .addPath(path)
-                        .call()
-                        .toList()
-                    
-                    if (commits.isNotEmpty()) {
-                        // Count unique authors
-                        val authorCount = commits.map { it.authorIdent.name }.distinct().size
-                        
-                        // If more than 5 authors, it's a hot potato
-                        if (authorCount > 5) {
-                            hotPotatoes.add(mapOf(
-                                "file" to path,
-                                "authorCount" to authorCount,
-                                "commitCount" to commits.size
-                            ))
-                        }
+            val deadline = System.currentTimeMillis() + SCAN_BUDGET_MS
+            var examined = 0
+
+            // Same bounding as detectZombieCode. The per-file log here had NO
+            // max count at all, making this O(files x all commits).
+            TreeWalk(git.repository).use { fileTreeWalk ->
+                fileTreeWalk.addTree(git.repository.resolve(org.eclipse.jgit.lib.Constants.HEAD))
+                fileTreeWalk.isRecursive = true
+
+                while (fileTreeWalk.next()) {
+                    ProgressManager.checkCanceled()
+                    if (hotPotatoes.size >= 30) break
+                    if (examined >= MAX_SCANNED_TREE_FILES) break
+                    if (System.currentTimeMillis() > deadline) break
+
+                    if (fileTreeWalk.isSubtree) continue
+                    val path = fileTreeWalk.pathString
+                    if (isSkippedPath(path)) continue
+                    examined++
+
+                    val commits = fileHistory(git, path)
+                    if (commits.isEmpty()) continue
+
+                    val authors = HashSet<String>()
+                    for (commit in commits) {
+                        ProgressManager.checkCanceled()
+                        authors.add(commit.authorIdent.name)
+                    }
+
+                    // If more than 5 authors, it's a hot potato
+                    if (authors.size > 5) {
+                        hotPotatoes.add(mapOf(
+                            "file" to path,
+                            "authorCount" to authors.size,
+                            "commitCount" to commits.size
+                        ))
                     }
                 }
             }
-            
+
             // Sort by author count in descending order
             hotPotatoes.sortedByDescending { it["authorCount"] as Int }
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            println("Error detecting hot potato files: ${e.message}")
+            log.warn("Error detecting hot potato files: ${e.message}", e)
             emptyList()
         }
     }
 
+    private data class TourCommit(
+        val hash: String,
+        val author: String,
+        val date: Date,
+        val message: String
+    )
+
+    /**
+     * Milestones in [file]'s history.
+     *
+     * This ran a full tree diff for EVERY commit pair in the file's history.
+     * Kotlin's `filter` is eager, so the trailing `.take(3)` did not stop the
+     * work — a 200-commit file cost ~398 RevWalks and hundreds of thousands of
+     * tree entries (seconds of blocking), and it is reached from
+     * `VestigeService.computeAnalysisSync` on every tab switch and every save.
+     *
+     * The diffs are gone. Their predicate asked whether the commit modified
+     * [filePath], which the path-filtered log already guarantees for every
+     * commit it returns — so the predicate was vacuously true and the whole
+     * diff was pure cost. "Refactor" milestones now come from a commit-message
+     * heuristic, which is cheap and actually discriminates.
+     */
     fun generateOnboardingTour(file: VirtualFile): List<OnboardingMilestone> {
         val git = getGitRepo(file) ?: return emptyList()
         val repo = git.repository
-        val filePath = file.path.substring(repo.directory.parent.length + 1)
-        
+        val filePath = relativizePath(repo, file) ?: return emptyList()
+
         val commits = try {
-             git.log()
-                .addPath(filePath)
-                .call()
-                .map { commit -> 
-                    mapOf(
-                        "hash" to commit.name,
-                        "author" to commit.authorIdent.name,
-                        "date" to Date(commit.commitTime * 1000L),
-                        "message" to commit.fullMessage
-                    )
-                }
+            fileHistory(git, filePath).map { commit ->
+                TourCommit(
+                    hash = commit.name,
+                    author = commit.authorIdent.name,
+                    date = Date(commit.commitTime * 1000L),
+                    message = commit.fullMessage
+                )
+            }
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             emptyList()
         }
@@ -749,99 +990,94 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
         if (commits.isEmpty()) return emptyList()
 
         val milestones = mutableListOf<OnboardingMilestone>()
-        
+
         // Add file creation as first milestone
+        val birth = commits.last()
         milestones.add(OnboardingMilestone(
             type = MilestoneType.BIRTH,
             icon = "",
             content = "File was created",
-            date = commits.last()["date"] as Date,
-            author = commits.last()["author"] as String,
-            hash = commits.last()["hash"] as String,
+            date = birth.date,
+            author = birth.author,
+            hash = birth.hash,
             importance = 10
         ))
-        
-        // Look for major refactoring (large changes)
-        val largeChanges = commits.windowed(2).filter { (prev, curr) ->
-            val diff = git.diff()
-                .setOldTree(prepareTreeParser(repo, "${curr["hash"]}^"))
-                .setNewTree(prepareTreeParser(repo, curr["hash"] as String))
-                .call()
-            
-            diff.any { diffEntry -> 
-                diffEntry.changeType == DiffEntry.ChangeType.MODIFY && 
-                diffEntry.oldPath == filePath
+
+        // Refactor milestones: message heuristic, lazily evaluated so `take(3)`
+        // actually bounds the work.
+        commits.asSequence()
+            .filter { RE_REFACTOR_MESSAGE.containsMatchIn(it.message) }
+            .take(3)
+            .forEachIndexed { index, commit ->
+                milestones.add(OnboardingMilestone(
+                    type = MilestoneType.REFACTOR,
+                    icon = "",
+                    content = "Refactoring: ${commit.message.lineSequence().first().take(80)}",
+                    date = commit.date,
+                    author = commit.author,
+                    hash = commit.hash,
+                    importance = 8 - (index * 2)
+                ))
             }
-        }.take(3) // Limit to top 3 largest changes
-        
-        largeChanges.forEachIndexed { index, (_, curr) ->
-            milestones.add(OnboardingMilestone(
-                type = MilestoneType.REFACTOR,
-                icon = "",
-                content = "Major refactoring occurred",
-                date = curr["date"] as Date,
-                author = curr["author"] as String,
-                hash = curr["hash"] as String,
-                importance = 8 - (index * 2) // Decrease importance for subsequent refactorings
-            ))
-        }
-        
-        // Look for bug fixes
-        val bugFixes = commits.filter { commit ->
-            val message = commit["message"] as String
-            message.matches("(?i).* (fix|bug|issue|error|crash).*".toRegex())
-        }.take(3) // Limit to 3 most recent bug fixes
-            
-        bugFixes.forEach { commit ->
-            milestones.add(OnboardingMilestone(
-                type = MilestoneType.BUGFIX_CLUSTER,
-                icon = "",
-                content = "Bug fix: ${(commit["message"] as String).take(50)}...",
-                date = commit["date"] as Date,
-                author = commit["author"] as String,
-                hash = commit["hash"] as String,
-                importance = 7
-            ))
-        }
 
-        // 5. Dependency Changes
-        val dependencyChanges = commits.filter { commit ->
-            val msg = (commit["message"] as String).lowercase()
-            (msg.contains("upgrade") || msg.contains("update") || msg.contains("migrate") ||
-             msg.contains("dependency") || msg.contains("package")) &&
-            (msg.contains("version") || Regex("v\\d").containsMatchIn(msg) || Regex("@\\d").containsMatchIn(msg))
-        }.take(2)
+        // Bug fixes — 3 most recent
+        commits.asSequence()
+            .filter { RE_BUGFIX_MESSAGE.containsMatchIn(it.message) }
+            .take(3)
+            .forEach { commit ->
+                milestones.add(OnboardingMilestone(
+                    type = MilestoneType.BUGFIX_CLUSTER,
+                    icon = "",
+                    content = "Bug fix: ${commit.message.take(50)}...",
+                    date = commit.date,
+                    author = commit.author,
+                    hash = commit.hash,
+                    importance = 7
+                ))
+            }
 
-        dependencyChanges.forEach { commit ->
-            milestones.add(OnboardingMilestone(
-                type = MilestoneType.DEPENDENCY,
-                icon = "📦",
-                content = "Dependency update: ${(commit["message"] as String).take(100)}",
-                date = commit["date"] as Date,
-                author = commit["author"] as String,
-                hash = commit["hash"] as String,
-                importance = 5
-            ))
-        }
+        // Dependency changes
+        commits.asSequence()
+            .filter { commit ->
+                val msg = commit.message.lowercase()
+                (msg.contains("upgrade") || msg.contains("update") || msg.contains("migrate") ||
+                    msg.contains("dependency") || msg.contains("package")) &&
+                    (msg.contains("version") ||
+                        RE_VERSION_TAG.containsMatchIn(msg) ||
+                        RE_AT_VERSION.containsMatchIn(msg))
+            }
+            .take(2)
+            .forEach { commit ->
+                milestones.add(OnboardingMilestone(
+                    type = MilestoneType.DEPENDENCY,
+                    icon = "📦",
+                    content = "Dependency update: ${commit.message.take(100)}",
+                    date = commit.date,
+                    author = commit.author,
+                    hash = commit.hash,
+                    importance = 5
+                ))
+            }
 
-        // 6. Security Fixes
-        val securityFixes = commits.filter { commit ->
-            val msg = (commit["message"] as String).lowercase()
-            msg.contains("security") || msg.contains("cve") || msg.contains("vulnerability") ||
-            msg.contains("exploit") || msg.contains("xss") || msg.contains("injection")
-        }
-
-        securityFixes.forEach { commit ->
-            milestones.add(OnboardingMilestone(
-                type = MilestoneType.SECURITY,
-                icon = "🔒",
-                content = "Security fix: ${(commit["message"] as String).take(100)}",
-                date = commit["date"] as Date,
-                author = commit["author"] as String,
-                hash = commit["hash"] as String,
-                importance = 10
-            ))
-        }
+        // Security fixes — previously unbounded, now capped at 3
+        commits.asSequence()
+            .filter { commit ->
+                val msg = commit.message.lowercase()
+                msg.contains("security") || msg.contains("cve") || msg.contains("vulnerability") ||
+                    msg.contains("exploit") || msg.contains("xss") || msg.contains("injection")
+            }
+            .take(3)
+            .forEach { commit ->
+                milestones.add(OnboardingMilestone(
+                    type = MilestoneType.SECURITY,
+                    icon = "🔒",
+                    content = "Security fix: ${commit.message.take(100)}",
+                    date = commit.date,
+                    author = commit.author,
+                    hash = commit.hash,
+                    importance = 10
+                ))
+            }
 
         // Sort by date (oldest first) and then by importance
         return milestones
@@ -885,11 +1121,20 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
             )
         }
 
-        // Quick facts
-        val lineCount = try {
-            String(file.contentsToByteArray()).lines().size
-        } catch (e: Exception) {
-            0
+        // Quick facts. Very large files are estimated rather than fully read:
+        // the old version built a String plus a List of every line to count them.
+        val lineCount = if (file.length > MAX_TEXT_BYTES) {
+            (file.length / 40).toInt().coerceAtLeast(1)
+        } else {
+            try {
+                var lines = 1
+                for (b in file.contentsToByteArray()) if (b == '\n'.code.toByte()) lines++
+                lines
+            } catch (e: ProcessCanceledException) {
+                throw e
+            } catch (e: Exception) {
+                0
+            }
         }
 
         val facts = QuickFacts(
@@ -916,18 +1161,20 @@ class VestigeGitAnalyzer(private val project: Project) : Disposable {
         }
     }
     private fun extractKeywords(messages: List<String>): List<String> {
-        val stopWords = setOf("the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "up", "about", "into", "over", "after", "fix", "chore", "feat", "docs", "style", "refactor", "perf", "test", "merge", "branch")
         val wordCounts = mutableMapOf<String, Int>()
-        
+
+        // RE_NON_WORD and the stop-word set are compiled/allocated once in the
+        // companion; both were rebuilt on every call, per message.
         messages.forEach { msg ->
+            ProgressManager.checkCanceled()
             msg.lowercase()
-                .split(Regex("[^a-z0-9]"))
-                .filter { it.length > 3 && !stopWords.contains(it) }
+                .split(RE_NON_WORD)
+                .filter { it.length > 3 && !KEYWORD_STOP_WORDS.contains(it) }
                 .forEach { word ->
                     wordCounts[word] = (wordCounts[word] ?: 0) + 1
                 }
         }
-        
+
         return wordCounts.entries
             .sortedByDescending { it.value }
             .map { it.key }

@@ -5,103 +5,153 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.ui.JBColor
-import java.awt.*
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
+import com.intellij.ui.components.JBLabel
+import com.intellij.util.ui.JBUI
+import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.GridLayout
+import javax.swing.Box
+import javax.swing.BoxLayout
+import javax.swing.JComponent
 import javax.swing.JPanel
-import javax.swing.Timer
-import kotlin.math.*
 
-class VestigeGravityWellPanel(private val project: Project) : JPanel(), VestigeService.AnalysisListener, Disposable {
-    private var angle = 0.0
-    private var mouseX = 0
-    private var mouseY = 0
-    private var gravityLevel = 1.0
-    private var complexityAlpha = 150
+/**
+ * How much churn and branching the current file carries.
+ *
+ * This was the "Gravity Well": a 33 fps Swing timer animating nine particles
+ * on elliptical orbits around a radial-gradient blob, with the orbit radius
+ * scaled by commit count and particle alpha by cyclomatic complexity. The two
+ * real numbers were encoded as the speed and opacity of decorative dots, which
+ * is unreadable — you cannot tell 40 commits from 60 by watching dots orbit.
+ *
+ * The same two numbers are now stated as figures with meters. The animation
+ * timer is gone entirely, so an open tool window costs nothing when idle.
+ *
+ * The [VestigeService.AnalysisListener] registration and disposal are
+ * unchanged.
+ */
+class VestigeGravityWellPanel(private val project: Project) :
+    JPanel(BorderLayout()), VestigeService.AnalysisListener, Disposable {
 
-    init {
-        isOpaque = false
-        preferredSize = Dimension(300, 300)
-        project.getService(VestigeService::class.java).addListener(this)
-        Disposer.register(project, this)
-        
-        addMouseMotionListener(object : MouseAdapter() {
-            override fun mouseMoved(e: MouseEvent) {
-                mouseX = e.x
-                mouseY = e.y
-                repaint()
-            }
-        })
-
-        val timer = Timer(30) {
-            if (isShowing) {
-                angle += 0.05
-                repaint()
-            }
-        }
-        timer.start()
+    private val body = JPanel(BorderLayout()).apply { isOpaque = false }
+    private val subtitle = JBLabel("No file analysed yet").apply {
+        font = VestigeUI.captionFont()
+        foreground = VestigeUI.TextMuted
+        alignmentX = Component.LEFT_ALIGNMENT
     }
 
+    init {
+        background = VestigeUI.Surface
+        isOpaque = true
+        border = JBUI.Borders.empty(VestigeUI.SpaceLg)
+
+        add(header(), BorderLayout.NORTH)
+        add(body, BorderLayout.CENTER)
+
+        showEmpty()
+
+        project.getService(VestigeService::class.java).addListener(this)
+        Disposer.register(project, this)
+    }
+
+    private fun header(): JComponent = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        isOpaque = false
+        border = JBUI.Borders.emptyBottom(VestigeUI.SpaceLg)
+        add(JBLabel("Change activity").apply {
+            font = VestigeUI.titleFont()
+            foreground = VestigeUI.TextPrimary
+            alignmentX = Component.LEFT_ALIGNMENT
+        })
+        add(Box.createVerticalStrut(VestigeUI.SpaceXs))
+        add(subtitle)
+    }
+
+    /** Called on the EDT by the service when a background analysis completes. */
     override fun onAnalysisUpdated(file: VirtualFile, result: VestigeService.AnalysisResult) {
-        gravityLevel = 1.0 + (result.stats?.commits ?: 0) / 10.0
-        complexityAlpha = min(255, 150 + (result.realTimeStats?.complexity ?: 0))
-        repaint()
+        val commits = result.stats?.commits ?: 0
+        val complexity = result.realTimeStats?.complexity ?: 0
+        subtitle.text = file.name
+        render(commits, complexity)
     }
 
     override fun dispose() {
         project.getService(VestigeService::class.java).removeListener(this)
     }
 
-    override fun paintComponent(g: Graphics) {
-        val g2 = g as Graphics2D
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-
-        val cx = width / 2
-        val cy = height / 2
-        
-        // Draw Radial Background Gird
-        g2.color = Color(60, 165, 250, 40)
-        for (i in 1..5) {
-            val r = (i * 40 * gravityLevel).toInt()
-            g2.drawOval(cx - r, cy - r, r * 2, r * 2)
-        }
-
-        // Draw Pulsating Gravity Well
-        val pulse = (sin(angle) * 10 * gravityLevel).toInt()
-        val wellR = (30 * gravityLevel).toInt() + pulse
-        val grad = RadialGradientPaint(
-            Point(cx, cy), max(1f, wellR.toFloat()), 
-            floatArrayOf(0f, 1f), 
-            arrayOf(Color(139, 92, 246, 200), Color(139, 92, 246, 0))
+    private fun showEmpty() {
+        body.removeAll()
+        body.add(
+            VestigeUI.emptyState(
+                "Nothing analysed yet",
+                "Open a file tracked in git — how often it changes and how branchy it is appear here."
+            ),
+            BorderLayout.CENTER
         )
-        g2.paint = grad
-        g2.fillOval(cx - wellR, cy - wellR, wellR * 2, wellR * 2)
-
-        // Draw Orbiting Particles (Simulating 3D context)
-        for (i in 0..8) {
-            val orbitR = (80 + i * 15 * gravityLevel).toInt()
-            val speed = (0.5 + i * 0.1) * gravityLevel
-            val pAngle = angle * speed + (i * PI / 4)
-            
-            val x = (cx + orbitR * cos(pAngle)).toInt()
-            val y = (cy + orbitR * sin(pAngle) * 0.4).toInt() // Elliptical for perspective
-            
-            val size = (4 + (sin(pAngle) * 2).toInt() * gravityLevel).toInt() // Pseudo-depth size
-            val alpha = complexityAlpha + (sin(pAngle) * 100).toInt()
-            
-            g2.color = Color(96, 165, 250, max(0, min(255, alpha)))
-            g2.fillOval(x - size / 2, y - size / 2, size, size)
-            
-            // Link to mouse for "Interaction"
-            if (dist(x, y, mouseX, mouseY) < 50) {
-                g2.stroke = BasicStroke(1f)
-                g2.drawLine(x, y, mouseX, mouseY)
-            }
-        }
+        body.revalidate()
+        body.repaint()
     }
 
-    private fun dist(x1: Int, y1: Int, x2: Int, y2: Int): Double {
-        return sqrt(((x2 - x1).toDouble().pow(2.0) + (y2 - y1).toDouble().pow(2.0)))
+    private fun render(commits: Int, complexity: Int) {
+        // Reference points for the meters: 60 commits and 40 branches are
+        // "a lot" for a single file. Stated here rather than hidden in a
+        // particle-alpha calculation.
+        val churnRatio = (commits / 60.0).coerceIn(0.0, 1.0)
+        val complexityRatio = (complexity / 40.0).coerceIn(0.0, 1.0)
+
+        val column = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
+        }
+
+        column.add(JPanel(GridLayout(1, 2, VestigeUI.SpaceSm, VestigeUI.SpaceSm)).apply {
+            isOpaque = false
+            alignmentX = Component.LEFT_ALIGNMENT
+            add(VestigeUI.metricTile("$commits", "Commits", VestigeUI.Blue))
+            add(VestigeUI.metricTile("$complexity", "Branches", VestigeUI.Purple))
+        })
+
+        column.add(VestigeUI.sectionHeader("How much this file churns").apply {
+            alignmentX = Component.LEFT_ALIGNMENT
+        })
+        column.add(VestigeUI.Meter(churnRatio, VestigeUI.toneForScore(1.0 - churnRatio)).apply {
+            alignmentX = Component.LEFT_ALIGNMENT
+        })
+        column.add(Box.createVerticalStrut(VestigeUI.SpaceXs))
+        column.add(caption(churnDescription(commits)))
+
+        column.add(VestigeUI.sectionHeader("How branchy it is").apply {
+            alignmentX = Component.LEFT_ALIGNMENT
+        })
+        column.add(VestigeUI.Meter(complexityRatio, VestigeUI.toneForScore(1.0 - complexityRatio)).apply {
+            alignmentX = Component.LEFT_ALIGNMENT
+        })
+        column.add(Box.createVerticalStrut(VestigeUI.SpaceXs))
+        column.add(caption(complexityDescription(complexity)))
+
+        body.removeAll()
+        body.add(column, BorderLayout.NORTH)
+        body.revalidate()
+        body.repaint()
+    }
+
+    private fun caption(text: String): JComponent = JBLabel(text).apply {
+        font = VestigeUI.captionFont()
+        foreground = VestigeUI.TextMuted
+        alignmentX = Component.LEFT_ALIGNMENT
+    }
+
+    private fun churnDescription(commits: Int): String = when {
+        commits <= 1 -> "Barely touched since it was added."
+        commits < 10 -> "$commits commits — a settled file."
+        commits < 30 -> "$commits commits — changes regularly."
+        else -> "$commits commits — a hotspot; changes here are frequent."
+    }
+
+    private fun complexityDescription(complexity: Int): String = when {
+        complexity == 0 -> "No branching detected in the current text."
+        complexity < 10 -> "$complexity decision points — straightforward to follow."
+        complexity < 25 -> "$complexity decision points — moderately involved."
+        else -> "$complexity decision points — hard to reason about; worth splitting up."
     }
 }

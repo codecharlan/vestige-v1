@@ -9,7 +9,7 @@ plugins {
 val platformVersion = "2023.2.1"
 
 // Plugin version
-val pluginVersion = "1.0.6.2"
+val pluginVersion = "1.1.0"
 
 group = "com.codecharlan"
 version = pluginVersion
@@ -23,10 +23,9 @@ dependencies {
     compileOnly(kotlin("stdlib"))
     compileOnly("org.jetbrains.kotlin:kotlin-reflect")
     
-    // Coroutines - exclude stdlib to use platform's
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3") {
-        exclude(group = "org.jetbrains.kotlin")
-    }
+    // Coroutines - compileOnly: the IntelliJ Platform provides (patched) coroutines,
+    // and JetBrains forbids plugins from bundling their own copy.
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     
     // JGit for Git operations
     implementation("org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r") {
@@ -59,8 +58,8 @@ intellij {
     // Download sources
     downloadSources.set(true)
     
-    // Sandbox configuration
-    sandboxDir.set("${'$'}{rootProject.rootDir}/.sandbox")
+    // Sandbox configuration (under the build directory)
+    sandboxDir.set(layout.buildDirectory.dir("idea-sandbox").get().asFile.absolutePath)
     
     // Repositories
     repositories {
@@ -92,6 +91,28 @@ tasks {
 
     prepareSandbox {
         pluginJar.set(shadowJar.flatMap { it.archiveFile })
+        // The shadow jar already contains (relocated) JGit; do not also ship the
+        // unshaded runtime libraries (jgit, coroutines, ...) alongside it.
+        exclude { element ->
+            element.name.startsWith("org.eclipse.jgit") ||
+                element.name.startsWith("kotlinx-coroutines")
+        }
+    }
+
+    // Binary-compatibility check against the IDE range this plugin claims to
+    // support. The declared range (232 -> 252.*) is far wider than the platform
+    // it compiles against, so this is the check that catches a broken release
+    // before the Marketplace does. Override with -PverifyIdes=IC-2024.3,IC-2025.2
+    runPluginVerifier {
+        val requested = (project.findProperty("verifyIdes") as String?)
+            ?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
+        ideVersions.set(requested ?: listOf("IC-2023.2.1"))
+        failureLevel.set(
+            listOf(
+                org.jetbrains.intellij.tasks.RunPluginVerifierTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+                org.jetbrains.intellij.tasks.RunPluginVerifierTask.FailureLevel.INVALID_PLUGIN
+            )
+        )
     }
 
     patchPluginXml {

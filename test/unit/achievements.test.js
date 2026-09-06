@@ -1,6 +1,5 @@
 const assert = require('assert');
-const AchievementSystem = require('../../achievements');
-const vscode = require('vscode');
+const AchievementSystem = require('../../dist/achievements');
 
 suite('Achievements Test Suite', () => {
     let achievements;
@@ -21,22 +20,38 @@ suite('Achievements Test Suite', () => {
         assert.strictEqual(achievements.getCredits(), 10);
     });
 
-    test('isFeatureUnlocked handles credit-based locks', async () => {
-        assert.strictEqual(achievements.isFeatureUnlocked('wormhole'), false);
+    /**
+     * Features must never be withheld pending XP. These tests previously
+     * asserted the opposite — that the Time Machine, Wormhole, Ghost Cursor
+     * and AI Archaeologist stayed locked until the user had earned enough
+     * credits — which meant a new install advertised features it refused to
+     * run. The contract is now: achievements reward usage, they never gate it.
+     */
+    test('features are available immediately on a fresh install', () => {
+        assert.strictEqual(achievements.getCredits(), 0);
+        ['wormhole', 'timeMachine', 'ghostCursor', 'aiArchaeologist'].forEach(feature => {
+            assert.strictEqual(
+                achievements.isFeatureUnlocked(feature), true,
+                `${feature} must not be gated behind XP`
+            );
+        });
+    });
+
+    test('features stay available after earning credits', async () => {
         await achievements.addCredits(500);
         assert.strictEqual(achievements.isFeatureUnlocked('wormhole'), true);
+        assert.strictEqual(achievements.isFeatureUnlocked('aiArchaeologist'), true);
     });
 
-    test('isFeatureUnlocked handles achievement-based locks', async () => {
-        assert.strictEqual(achievements.isFeatureUnlocked('timeMachine'), false);
-        // Simulate achievement unlock
-        await mockStorage.update('vestige.unlocked', ['time_traveler']);
-        assert.strictEqual(achievements.isFeatureUnlocked('timeMachine'), true);
+    test('unknown feature ids are permitted rather than blocked', () => {
+        assert.strictEqual(achievements.isFeatureUnlocked('somethingNew'), true);
     });
 
-    test('isFeatureUnlocked handles complexity-based locks', async () => {
-        assert.strictEqual(achievements.isFeatureUnlocked('ghostCursor'), false);
-        await mockStorage.update('vestige.unlocked', ['a1', 'a2', 'a3']);
-        assert.strictEqual(achievements.isFeatureUnlocked('ghostCursor'), true);
+    test('achievement progress is still tracked and reportable', async () => {
+        await achievements.trackAction('viewOldFile', 1);
+        const progress = achievements.getProgress();
+        assert.ok(Array.isArray(progress), 'getProgress must return a list');
+        assert.ok(progress.length > 0, 'there should be achievements to report');
+        assert.ok(achievements.getCredits() > 0, 'credits should accrue from usage');
     });
 });

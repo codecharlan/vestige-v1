@@ -4,6 +4,8 @@ import com.codecharlan.vestige.logic.*
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.ui.Messages
 
 class ChatWithGhostAction : AnAction() {
@@ -24,26 +26,41 @@ class ToggleEchoAction : AnAction() {
 }
 
 class WormholeAction : AnAction() {
+    /**
+     * The history read is a git operation and runs in a [Task.Backgroundable];
+     * the picker opens from `onSuccess`. Calling `getFileHistory` inline froze
+     * the EDT for the length of the walk.
+     */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val editor = e.getData(CommonDataKeys.EDITOR) ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        val analyzer = project.getService(com.codecharlan.vestige.logic.VestigeGitAnalyzer::class.java)
-        val commits = analyzer.getFileHistory(file)
+        val analyzer = project.getService(VestigeGitAnalyzer::class.java)
 
-        if (commits.isEmpty()) {
-            Messages.showWarningDialog(project, "No history found for this file.", "Temporal Wormhole")
-            return
-        }
+        object : Task.Backgroundable(project, "Reading history of ${file.name}", true) {
+            private var commits: List<VestigeGitAnalyzer.CommitInfo> = emptyList()
 
-        val picker = VestigeCommitPicker(project, file, commits)
-        if (picker.showAndGet()) {
-            val hash = picker.getSelectedHash()
-            if (!hash.isNullOrEmpty()) {
-                val service = project.getService(VestigeWormholeService::class.java)
-                service.openPortal(editor, hash, "// Content simulated from past state...")
+            override fun run(indicator: ProgressIndicator) {
+                commits = analyzer.getFileHistory(file)
             }
-        }
+
+            override fun onSuccess() {
+                if (project.isDisposed || editor.isDisposed) return
+                if (commits.isEmpty()) {
+                    Messages.showWarningDialog(project, "No history found for this file.", "Temporal Wormhole")
+                    return
+                }
+
+                val picker = VestigeCommitPicker(project, file, commits)
+                if (picker.showAndGet()) {
+                    val hash = picker.getSelectedHash()
+                    if (!hash.isNullOrEmpty()) {
+                        val service = project.getService(VestigeWormholeService::class.java)
+                        service.openPortal(editor, file, hash)
+                    }
+                }
+            }
+        }.queue()
     }
 }
 

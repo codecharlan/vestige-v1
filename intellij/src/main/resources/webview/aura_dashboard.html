@@ -198,75 +198,89 @@
 
 <body>
     <div class="header">
-        <div class="title">VESTIGE AURA</div>
+        <div class="title">VESTIGE</div>
+        <!-- "Zenith Active" asserted a state the plugin does not track. -->
         <div class="status-badge">
             <div class="status-dot"></div>
-            Zenith Active
+            Reading local git history
         </div>
     </div>
 
     <div class="grid">
+        <!-- Values are filled in by window.updateStats from real analysis.
+             The placeholders are em dashes, not sample numbers: this card
+             previously shipped a hardcoded "12.4%" and a "↓ 2.1% from last
+             week" trend, and there is no week-over-week data anywhere in the
+             plugin to support either. -->
         <div class="card">
-            <div class="card-title">Temporal Churn</div>
-            <div class="card-value" id="churn-val">12.4%</div>
-            <p style="font-size: 0.75rem; color: #10B981; margin-top: 4px;">↓ 2.1% from last week</p>
+            <div class="card-title">Commits</div>
+            <div class="card-value" id="churn-val">—</div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Recorded changes to this file</p>
         </div>
         <div class="card">
-            <div class="card-title">Code Fossils</div>
-            <div class="card-value" id="fossil-val">42</div>
-            <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Ancient files detected</p>
+            <div class="card-title">Unchanged Over A Year</div>
+            <div class="card-value" id="fossil-val">—</div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">In the current file</p>
         </div>
     </div>
 
+    <!-- The six-bar "Project Pulse" chart that used to sit here had six
+         hardcoded heights and was not derived from anything, and the three
+         figures below it were the literals 94/100, 3 and 82%. A chart of
+         nothing is worse than no chart, so both are gone; these rows are now
+         populated from the real analysis. -->
     <div class="card" style="flex: 1;">
-        <div class="card-title">Project Pulse</div>
-        <div style="height: 100px; display: flex; align-items: flex-end; gap: 4px; margin-top: 20px;">
-            <div style="flex: 1; height: 40%; background: #10B981; border-radius: 4px 4px 0 0; opacity: 0.3;"></div>
-            <div style="flex: 1; height: 60%; background: #10B981; border-radius: 4px 4px 0 0; opacity: 0.5;"></div>
-            <div style="flex: 1; height: 85%; background: #10B981; border-radius: 4px 4px 0 0; opacity: 0.8;"></div>
-            <div style="flex: 1; height: 50%; background: #3B82F6; border-radius: 4px 4px 0 0; opacity: 0.6;"></div>
-            <div style="flex: 1; height: 95%; background: #3B82F6; border-radius: 4px 4px 0 0;"></div>
-            <div style="flex: 1; height: 30%; background: #F59E0B; border-radius: 4px 4px 0 0; opacity: 0.4;"></div>
-        </div>
-        <ul class="stats-list" style="margin-top: 24px;">
+        <div class="card-title">This File</div>
+        <ul class="stats-list" style="margin-top: 12px;">
             <li class="stat-item">
-                <span class="stat-label">Stability Index</span>
-                <span style="color: #10B981;">94/100</span>
+                <span class="stat-label">Stability</span>
+                <span id="stability-val">—</span>
             </li>
             <li class="stat-item">
-                <span class="stat-label">Bus Factor</span>
-                <span style="color: #F59E0B;">3</span>
+                <span class="stat-label">People holding most of the history</span>
+                <span id="busfactor-val">—</span>
             </li>
             <li class="stat-item">
-                <span class="stat-label">Lore Capture Rate</span>
-                <span>82%</span>
+                <span class="stat-label">Main author</span>
+                <span id="owner-val">—</span>
             </li>
         </ul>
+        <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 16px;">
+            Stability falls as a file accumulates commits. It orders files within this
+            repository; it is not a score out of anything.
+        </p>
     </div>
 
     <div class="sentinel-section">
         <div class="sentinel-avatar" id="pet-avatar">🦉</div>
         <div class="sentinel-text">
-            <div class="card-title" style="margin-bottom: 4px;">Sentient Insight</div>
-            <div class="sentinel-bubble shimmer-text" id="insight-text">"The history of this project is a tapestry of
-                bold decisions and cautious refactors."</div>
+            <div class="card-title" style="margin-bottom: 4px;">Summary</div>
+            <div class="sentinel-bubble" id="insight-text">Open a tracked file to see a summary of its history.</div>
         </div>
     </div>
 
     <script>
-        function updateStats(data) {
-            if (data.churn) document.getElementById('churn-val').innerText = data.churn;
-            if (data.fossils) document.getElementById('fossil-val').innerText = data.fossils;
-            if (data.insight) document.getElementById('insight-text').innerText = data.insight;
-            if (data.pet) document.getElementById('pet-avatar').innerText = data.pet;
+        function setText(id, value) {
+            var el = document.getElementById(id);
+            if (el && value !== undefined && value !== null && value !== '') {
+                el.innerText = value;
+            }
         }
 
-        // Simulate initial loading
-        setTimeout(() => {
-            updateStats({
-                insight: "I've detected a significant ownership transition in the core logic."
-            });
-        }, 3000);
+        function updateStats(data) {
+            setText('churn-val', data.churn);
+            setText('fossil-val', data.fossils);
+            setText('stability-val', data.stability);
+            setText('busfactor-val', data.busFactor);
+            setText('owner-val', data.owner);
+            setText('insight-text', data.insight);
+            setText('pet-avatar', data.pet);
+        }
+
+        // No simulated loading. The previous version used a three-second timer
+        // to inject a canned sentence claiming it had detected an ownership
+        // transition, on any repository. Values now arrive only from
+        // window.updateStats, driven by real analysis.
     </script>
 </body>
 

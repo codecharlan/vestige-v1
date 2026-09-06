@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { LoreParser } = require('../../lore-service');
+const { LoreParser } = require('../../dist/lore-service');
 
 suite('LoreParser Test Suite', () => {
     let parser;

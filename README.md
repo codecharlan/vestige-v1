@@ -1,178 +1,147 @@
-# 🗿 Vestige - Temporal Code Intelligence
-> *Uncover the traces of your codebase through time. Certified Master Release.*
+# Vestige
 
-Vestige brings **temporal awareness** directly into your code editor. See which code is ancient, which is churning, and which just changed—all without leaving your file.
+**Know what you're about to break.** Vestige reads your git history and answers the questions that matter right before you change code: what else changes with this file, who actually knows it, and what decisions already constrain it.
 
-Vestige 2.0 (**Centurion Vision**) introduces a world-class temporal intelligence engine and **Zenith Elite** aesthetics. Experience a premium, innovative engineering platform that reveals code age, churn, and evolution through the lens of AI.
-
----
-
-## 🏛️ Core Features (The Foundation)
-*Essential temporal utility for every developer.*
-
-### 🗺️ Heatmap Explorer
-Files in the Explorer are automatically color-coded based on their git history:
-- 🔥 **High Churn** - Files that change frequently (Red indicator)
-- 🗿 **Fossils** - Ancient, untouched code (Grey indicator)
-- ✨ **Recent** - Fresh changes (Green indicator)
-
-### ✍️ Inline Temporal Annotations
-Tactile editor decorations that reveal history as you code:
-- **Visual Cues**: Instantly see if a block of code is a "fossil" or "active churn".
-- **Dynamic Updates**: Decorations update automatically as you commit and edit.
-
-### 🕰️ Time Travel (Timeline Panel)
-View the complete commit history of your file in a beautiful, lazy-loaded timeline:
-- Chronological commit list with full author metadata.
-- **👁️ View File at Commit**: Click to see exactly what the file looked like at any point in history.
-- **Trend Analysis**: Statistical view of commit frequency over years/months.
-
-### 🔍 Smart Refactoring & Coupling
-Discover hidden architectural patterns:
-- **Coupled Files**: Identify files that frequently change together with your current file.
-- **Dependency Insights**: Uncover hidden connections between distant modules (e.g., "🔗 Coupled with: `utils.js` (80% correlation)").
-
-### 🛡️ Rich Status Bar & Hover
-- **Status Bar Metrics**: Live Stability Score (0-100%) and Top Contributor ownership.
-- **Deep Hover**: Hover over any line to see last change date, author, commit hash, and file-level churn statistics.
+It runs entirely on your local git history. No account, no sign-in, no telemetry, and nothing is computed until you ask for it.
 
 ---
 
-## 🌌 Zenith Elite Aesthetics (New!)
-*The Holographic Frontier of Engineering Tools.*
+## What it's for
 
-- **Organic Depth**: Micro-noise textures and radial mesh gradients for a tactile feel.
-- **Kinetic Typography**: Variable font weight shifts that react to editor hover.
-- **Glassmorphism 2.0**: Premium backdrop blur with luminous, reactive borders.
-- **Liquid Status Bars**: Fluid-dynamic animations for stability and health indicators.
-- **Bioluminescent UI**: Pulsing organic light indicators for technical debt.
+Most git tooling answers a *spatial* question — "who wrote each line of this file". That's already built into VS Code and IntelliJ, and GitLens does it for 52 million people. Vestige answers the questions those tools don't:
 
----
+### Files that change together
 
-## 🧠 Centurion Intelligence (AI) (New!)
-*Powered by Historical Intent.*
+When you save a file, Vestige tells you which files git history says usually change with it:
 
-- **AI Code Archaeologist**: Hypothesizes why legacy code persists (Load-Bearing Wall, Sunken Treasure, or Zombie).
-- **Historical Persona**: Understand the "soul" of the original author through AI-synthesized intent.
-- **Ghost Chat**: Pair program with the "Ghost" of a developer using their historical intent.
-- **Predictive ROI**: AI-driven stability impact analysis for proposed refactorings.
-- **Automatic Summaries**: Single-sentence technical summaries for complex historical diffs.
-- **Narrative Biography**: AI-generated story of a file's evolution and purpose.
+> `auth-service.ts` usually changes with this file — 11 shared commits (73%).
 
----
+This is the feature to try first. Co-change analysis is well-established in research and shipped commercially, but there is essentially no in-editor implementation of it. It's a suggestion, not an alarm: at most three files, once per file per session, always with the shared-commit count so you can judge it yourself.
 
-## 📜 Lore System (New!)
-*Capture and preserve architectural decisions directly in your codebase.*
+`Vestige: Files That Change With This One` · disable with `vestige.coupledFileSuggestions`
 
-- **Lore Decisions**: Document "why" decisions were made with structured metadata (author, date, context).
-- **Implicit Lore Extraction**: Automatically extracts architectural decisions from commit messages.
-- **Shadow Lore Detection**: Identifies undocumented tribal knowledge from code patterns.
-- **Lore Panel**: Browse, search, and manage all architectural decisions in one place.
-- **Promote to Lore**: Convert commit messages into permanent architectural records.
-- **Webhook Integration**: Share Lore insights with team via Slack/Discord.
+### Who to ask
 
----
+If you're about to change a file you have almost no history with, Vestige says so and names the person who does:
 
-## ⏪ Time Machine & Rewind (New!)
-*Travel through your codebase's history with precision.*
+> You've authored 3% of this file; Alice has 80%.
 
-- **Workspace Rewind**: Restore your entire workspace to any previous commit.
-- **File Time Travel**: View and compare any file at different points in history.
-- **Temporal Wormholes**: Jump between related historical commits instantly.
-- **Ghost Cursor Replay**: Watch code evolution with animated playback.
-- **Commit Snapshots**: One-click access to any historical state.
+This is the one ownership signal with strong empirical support — the count of contributors with a small share of a file's history predicted defects better than any other metric Microsoft measured across Windows Vista and 7. It's framed as a review suggestion, never as a score about a person.
 
----
+`Vestige: Find Experts for This File`
 
-## 💀 Code Graveyard (New!)
-*Honor deleted code and learn from the past.*
+### History of a selection
 
-- **Deleted Files Tracker**: Browse all files that have been removed from the codebase.
-- **Obituary Generator**: AI-generated tributes for deleted code with historical context.
-- **Resurrection**: Restore deleted files with full history intact.
-- **Deletion Analytics**: Understand patterns in code removal over time.
+Select a few lines and get the history of *those lines* — not the whole file:
+
+`Ctrl+Shift+L` / `Cmd+Shift+L`
+
+Blame tells you who touched a line last. This tells you how the block got to look the way it does, using `git log -L`.
+
+### CODEOWNERS that tells the truth
+
+Your CODEOWNERS file is hand-maintained and nothing validates it. GitHub silently skips malformed lines, stops loading the file entirely past 3MB, and never checks whether an owner has ever committed or has since left. Vestige compares it against real history:
+
+`Vestige: Audit CODEOWNERS Against History`
+
+### Recovering deleted code
+
+Browse files deleted from the repository and restore them. IntelliJ's Local History covers the last five days; this covers anything git remembers.
+
+`Vestige: Show Code Graveyard`
+
+### Decisions in the gutter
+
+If you keep architectural decision records, Vestige links them to the code they constrain and surfaces them where the change is being made.
 
 ---
 
-## 🤝 Onboarding Assistant (New!)
-*Accelerate developer onboarding with AI-powered file history tours.*
+## Also included
 
-- **AI Narratives**: Friendly 2-3 sentence summaries of file history, perfect for new team members.
-- **8 Milestone Types**: Automatically detects Birth, Refactors, Bug Clusters, Ownership Transitions, Architecture Decisions, Epochs, Dependencies, and Security Fixes.
-- **Expert Recommendations**: Shows top 3 contributors with ownership percentages and roles (Primary Maintainer, Core Contributor).
-- **Related Files**: Displays coupled files that frequently change together with coupling scores.
-- **Interactive Tour**: Step-by-step modal walkthrough of key milestones with progress tracking and importance badges.
-- **Quick Facts**: Visual cards showing file age, total changes, contributors, and lines of code.
-- **Zero Configuration**: Automatically generates for every file analysis, with fallback narratives when AI is unavailable.
-
----
-
-## 📊 Immersive Visualizations
-- **Gravity Well (3D)**: A physics-based simulation of file complexity and "gravitational" debt.
-- **Pulse Panel**: Animated architectural pulse showing repository activity as a heartbeat.
-- **Evolution Replay**: Watch your code evolve over time with animated playback.
-- **Sankey Flow**: Visualize the movement of code between modules over time.
-- **Blast Radius Analyzer**: Calculate the "impact tremor" of a file's complexity.
-- **Sunburst Ownership**: Hierarchical treemap revealing the "Kings" of the codebase.
-- **Archaeology Skill Trees**: Progress through discovery to unlock advanced features.
-- **Performance Timeline**: Track build times and performance metrics over history.
-- **Code Flow Visualization**: See how code moves through your architecture.
+| Feature | What it does |
+|---|---|
+| **File timeline** | Commit history with coupling, epochs, and bus factor for one file |
+| **Code Historian** | Ask a question about a file; answers are shown *with the commits they're based on* |
+| **Zombie detection** | Code that hasn't moved while the file around it did |
+| **Documentation drift** | Docs whose sibling code has moved on without them |
+| **Hot potato files** | Unusually high author turnover |
+| **Debt ranking** | A relative churn × size × age ordering, to decide what to open first |
+| **Architecture map** | Emergent modules from co-change clustering across the repo |
+| **Time travel** | Scrub a file through its revisions |
 
 ---
 
-## 🎮 Gamification & Achievements (New!)
-*Make code archaeology fun and rewarding.*
+## Honest limits
 
-- **Achievement System**: Unlock badges like "Fossil Hunter", "Time Traveler", "Debt Destroyer".
-- **XP & Credits**: Earn Code Archaeology Credits for exploring and improving code.
-- **Leaderboards**: Compete with teammates on code quality metrics.
-- **Skill Tree**: Unlock advanced features by completing challenges.
-- **Temporal Unlocking**: Advanced features unlock as you explore more history.
+Worth knowing before you rely on any number here:
 
----
+- **The debt score is a ranking, not a measurement.** It orders files within one repository. It is not comparable across repositories and is never shown as money or hours — converting an arbitrary score into a dollar figure produces a confident number with no basis behind it.
+- **Co-change is a suggestion.** Published precision is around 0.26–0.30, but the top-three hit rate is 64–70% and the false-alarm rate is about 2%. Useful for "also look here", not for gating anything. It degrades on fast-growing codebases.
+- **Bus factor is deliberately de-emphasised.** Published estimators have a mean error above 5 on a small-integer quantity, and roughly 44% of what people know lives in channels git cannot see. Vestige reports minor-contributor risk instead, which has real support.
+- **Blame is poisoned by reformatting.** A whitespace commit or a squash-merge can make history attribute code to whoever ran the formatter. Treat authorship near such commits with suspicion.
+- **AI answers are shown with their sources.** The specific failure of AI code comprehension is inventing a plausible, wrong reason code exists. Every answer is displayed next to the commits and decisions it was drawn from so you can check it.
 
-## 🛡️ Enterprise Strategy
-- **Handoff Assistant**: Identifies modules at risk of knowledge loss.
-- **Mentorship Matcher**: Recommends historical experts for any file.
-- **Debt Horizon Forecasting**: Predicts technical debt growth over 180 days.
-- **Multi-Repo Dashboard**: Aggregate metrics across all workspace folders.
-- **Bus Factor Analysis**: Identify single points of failure in code ownership.
-- **Documentation Drift Detection**: Alerts when docs fall out of sync with code.
-- **Hot Potato Detection**: Find files with excessive author turnover.
-- **Zombie Code Finder**: Identify stagnant code that hasn't changed in 365+ days.
-- **Webhook Integration**: JIRA ticket creation and Slack/Discord Lore sharing.
+There is no leaderboard and no per-person productivity metric, and there won't be. Vestige reports facts about the codebase, not facts about people.
 
 ---
 
-## 🚀 Installation & Setup
+## Setup
 
-### VS Code
-1. Search "Vestige" in the Marketplace.
-2. Click **Install**.
-3. (Optional) Set `vestige.openaiApiKey` for AI features.
+```bash
+npm install
+npm run compile
+# Press F5 in VS Code to launch the Extension Development Host
+```
 
-### IntelliJ
-1. Open **Settings** > **Plugins**.
-2. Install **Vestige** from Disk or Marketplace.
-3. Access the **Vestige Sidebar** for full temporal dashboards.
+### AI features (optional)
+
+Everything above except the Historian, Archaeologist and Resurrection Mode works without AI.
+
+If you have **GitHub Copilot**, AI features use it automatically — no key needed. Otherwise run **`Vestige: Set OpenAI API Key`**, which stores the key in VS Code Secret Storage rather than settings.
+
+To turn AI off completely, set `vestige.disableAI`. That makes every AI path unreachable rather than merely idle, for environments where an installed AI component is itself the problem.
 
 ---
 
-## ⚙️ Configuration
+## Configuration
+
 ```json
 {
-  "vestige.enabled": true,
-  "vestige.churnThreshold": 10,
+  "vestige.coupledFileSuggestions": true,
+  "vestige.coupledFileThreshold": 50,
+  "vestige.codeLensMode": "risk-only",
+  "vestige.disableAI": false,
   "vestige.fossilThreshold": 365,
-  "vestige.openaiApiKey": "sk-...",
-  "vestige.collabWebhookUrl": "https://hooks.slack.com/..."
+  "vestige.churnThreshold": 10,
+  "vestige.zombieAgeDays": 365,
+  "vestige.driftDays": 30,
+  "vestige.hotPotatoAuthors": 5,
+  "vestige.collabWebhookUrl": ""
 }
 ```
 
-## 📝 License
-MIT License - see [LICENSE.md](./LICENSE.md)
+`codeLensMode` defaults to `risk-only`: at most one annotation per function, and only where history indicates something — a recorded decision, a churn hotspot, long stagnation, or concentrated ownership. Set `detailed` for author and age above every function, or `off` for none.
+
+### Keybindings
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl/Cmd+Shift+L` | History of the selected lines |
+| `Ctrl/Cmd+Shift+H` | Ask the Code Historian |
 
 ---
 
-**Built with ❤️ for developers who care about code history**
-🗿 *Vestige - Because every line has a story*
+## Development
+
+```bash
+npm run test:unit   # unit tests
+npm run lint        # eslint
+```
+
+The `intellij/` directory contains the IntelliJ IDEA plugin (Kotlin + JGit). See [SETUP.md](SETUP.md) for build instructions — note it must be verified with a clean build, as incremental compilation has previously masked a file that never compiled.
+
+---
+
+## License
+
+See [LICENSE.md](LICENSE.md).

@@ -3,202 +3,206 @@ package com.codecharlan.vestige.ui
 import com.codecharlan.vestige.logic.VestigeGitAnalyzer
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.ui.JBColor
-import java.awt.*
+import com.intellij.ui.components.JBLabel
+import com.intellij.util.ui.JBUI
+import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.Dimension
 import java.text.SimpleDateFormat
-import javax.swing.*
+import javax.swing.Action
+import javax.swing.Box
+import javax.swing.BoxLayout
+import javax.swing.JComponent
+import javax.swing.JPanel
+import javax.swing.JTextArea
 
 /**
- * Interactive Onboarding Tour Dialog - Modal step-by-step walkthrough
- * of file milestones with navigation controls
+ * Step-by-step walkthrough of a file's key commits.
+ *
+ * Restyled onto the design system: the content was previously centre-aligned
+ * with a 48pt emoji per step, `Font("Inter", …)` throughout (usually absent,
+ * so silently substituted) and a hand-built importance badge with a hardcoded
+ * translucent background. Body text is now left-aligned and readable at any
+ * theme, and the badge is the shared [VestigeUI.Pill].
+ *
+ * Navigation behaviour, button actions and step bookkeeping are unchanged.
  */
 class VestigeOnboardingTourDialog(
     private val project: Project,
     private val milestones: List<VestigeGitAnalyzer.OnboardingMilestone>
 ) : DialogWrapper(project) {
-    
+
     private var currentStep = 0
-    private val contentPanel = JPanel(BorderLayout())
-    private val progressBar = JProgressBar(0, milestones.size)
-    
+    private val contentPanel = JPanel(BorderLayout()).apply {
+        background = VestigeUI.Surface
+        isOpaque = true
+    }
+    private val progress = VestigeUI.Meter(0.0, VestigeUI.Blue)
+    private val stepLabel = JBLabel().apply {
+        font = VestigeUI.captionFont()
+        foreground = VestigeUI.TextMuted
+        alignmentX = Component.LEFT_ALIGNMENT
+    }
+
+    // Both navigation buttons always exist; their state is updated per step.
+    private val previousAction: Action = object : DialogWrapperAction("Previous") {
+        override fun doAction(e: java.awt.event.ActionEvent?) {
+            if (currentStep > 0) {
+                currentStep--
+                updateContent()
+            }
+        }
+    }
+
+    private val nextAction: Action = object : DialogWrapperAction("Next") {
+        init {
+            putValue(DEFAULT_ACTION, true)
+        }
+        override fun doAction(e: java.awt.event.ActionEvent?) {
+            if (currentStep < milestones.size - 1) {
+                currentStep++
+                updateContent()
+            } else {
+                // Last step: Next behaves as Finish.
+                close(OK_EXIT_CODE)
+            }
+        }
+    }
+
+    private val dismissAction: Action = object : DialogWrapperAction("Close") {
+        override fun doAction(e: java.awt.event.ActionEvent?) {
+            close(CANCEL_EXIT_CODE)
+        }
+    }
+
     init {
-        title = "Onboarding Tour"
+        title = "Walk Through Key Commits"
         init()
         updateContent()
     }
-    
+
     override fun createCenterPanel(): JComponent {
-        val mainPanel = JPanel(BorderLayout())
-        mainPanel.preferredSize = Dimension(600, 400)
-        mainPanel.background = JBColor.background()
-        
-        // Progress bar at top
-        progressBar.value = currentStep + 1
-        progressBar.isStringPainted = false
-        progressBar.foreground = Color(16, 185, 129)
-        progressBar.background = Color(96, 165, 250, 50)
-        progressBar.preferredSize = Dimension(600, 4)
-        
-        mainPanel.add(progressBar, BorderLayout.NORTH)
+        val mainPanel = JPanel(BorderLayout()).apply {
+            preferredSize = Dimension(JBUI.scale(600), JBUI.scale(400))
+            background = VestigeUI.Surface
+            isOpaque = true
+            border = JBUI.Borders.empty(VestigeUI.SpaceLg)
+        }
+
+        val top = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
+            border = JBUI.Borders.emptyBottom(VestigeUI.SpaceLg)
+            add(stepLabel)
+            add(Box.createVerticalStrut(VestigeUI.SpaceSm))
+            add(progress)
+        }
+
+        mainPanel.add(top, BorderLayout.NORTH)
         mainPanel.add(contentPanel, BorderLayout.CENTER)
-        
+
         return mainPanel
     }
-    
+
     override fun createActions(): Array<Action> {
-        val actions = mutableListOf<Action>()
-        
-        // Previous button
-        if (currentStep > 0) {
-            actions.add(object : DialogWrapperAction("← Previous") {
-                override fun doAction(e: java.awt.event.ActionEvent?) {
-                    if (currentStep > 0) {
-                        currentStep--
-                        updateContent()
-                    }
-                }
-            })
-        }
-        
-        // Next/Finish button
-        if (currentStep < milestones.size - 1) {
-            actions.add(object : DialogWrapperAction("Next →") {
-                init {
-                    putValue(DEFAULT_ACTION, true)
-                }
-                override fun doAction(e: java.awt.event.ActionEvent?) {
-                    if (currentStep < milestones.size - 1) {
-                        currentStep++
-                        updateContent()
-                    }
-                }
-            })
-        } else {
-            actions.add(object : DialogWrapperAction("🎉 Finish Tour") {
-                init {
-                    putValue(DEFAULT_ACTION, true)
-                }
-                override fun doAction(e: java.awt.event.ActionEvent?) {
-                    close(OK_EXIT_CODE)
-                }
-            })
-        }
-        
-        // Close button
-        actions.add(object : DialogWrapperAction("✕ Close") {
-            override fun doAction(e: java.awt.event.ActionEvent?) {
-                close(CANCEL_EXIT_CODE)
-            }
-        })
-        
-        return actions.toTypedArray()
+        return arrayOf(previousAction, nextAction, dismissAction)
     }
-    
+
     private fun updateContent() {
+        // Keep button states in sync with the current step.
+        previousAction.isEnabled = currentStep > 0
+        nextAction.putValue(
+            Action.NAME,
+            if (currentStep < milestones.size - 1) "Next" else "Finish"
+        )
+
         contentPanel.removeAll()
-        
+
+        if (milestones.isEmpty()) {
+            stepLabel.text = "Nothing to walk through"
+            progress.setValue(0.0)
+            contentPanel.add(
+                VestigeUI.emptyState(
+                    "No key commits",
+                    "Vestige found no notable commits for this file."
+                ),
+                BorderLayout.CENTER
+            )
+            contentPanel.revalidate()
+            contentPanel.repaint()
+            return
+        }
+
         val milestone = milestones[currentStep]
-        val panel = JPanel()
-        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.background = JBColor.background()
-        panel.border = BorderFactory.createEmptyBorder(30, 40, 30, 40)
-        
-        // Step counter
-        val stepLabel = JLabel("MILESTONE ${currentStep + 1} OF ${milestones.size}", SwingConstants.CENTER)
-        stepLabel.font = Font("Inter", Font.BOLD, 11)
-        stepLabel.foreground = JBColor.GRAY
-        stepLabel.alignmentX = Component.CENTER_ALIGNMENT
-        
-        panel.add(stepLabel)
-        panel.add(Box.createVerticalStrut(20))
-        
-        // Icon
-        val iconLabel = JLabel(milestone.icon, SwingConstants.CENTER)
-        iconLabel.font = Font("Dialog", Font.PLAIN, 48)
-        iconLabel.alignmentX = Component.CENTER_ALIGNMENT
-        
-        panel.add(iconLabel)
-        panel.add(Box.createVerticalStrut(10))
-        
-        // Type
-        val typeLabel = JLabel(milestone.type.name.replace("_", " "), SwingConstants.CENTER)
-        typeLabel.font = Font("Inter", Font.BOLD, 14)
-        typeLabel.foreground = Color(96, 165, 250)
-        typeLabel.alignmentX = Component.CENTER_ALIGNMENT
-        
-        panel.add(typeLabel)
-        panel.add(Box.createVerticalStrut(20))
-        
-        // Content
-        val contentArea = JTextArea(milestone.content)
-        contentArea.isEditable = false
-        contentArea.lineWrap = true
-        contentArea.wrapStyleWord = true
-        contentArea.background = JBColor.background()
-        contentArea.font = Font("Inter", Font.PLAIN, 14)
-        contentArea.foreground = JBColor.foreground()
-        contentArea.alignmentX = Component.CENTER_ALIGNMENT
-        
-        val contentWrapper = JPanel(BorderLayout())
-        contentWrapper.background = JBColor.background()
-        contentWrapper.add(contentArea, BorderLayout.CENTER)
-        contentWrapper.maximumSize = Dimension(500, 200)
-        
-        panel.add(contentWrapper)
-        panel.add(Box.createVerticalStrut(15))
-        
-        // Author
-        if (milestone.author != null) {
-            val authorLabel = JLabel("by ${milestone.author}", SwingConstants.CENTER)
-            authorLabel.font = Font("Inter", Font.PLAIN, 12)
-            authorLabel.foreground = JBColor.GRAY
-            authorLabel.alignmentX = Component.CENTER_ALIGNMENT
-            panel.add(authorLabel)
-            panel.add(Box.createVerticalStrut(5))
+
+        stepLabel.text = "Step ${currentStep + 1} of ${milestones.size}"
+        progress.setValue((currentStep + 1).toDouble() / milestones.size)
+
+        val tone = when {
+            milestone.importance > 8 -> VestigeUI.Red
+            milestone.importance > 6 -> VestigeUI.Amber
+            else -> VestigeUI.Blue
         }
-        
-        // Date
-        if (milestone.date != null) {
-            val dateFormatter = SimpleDateFormat("MMMM dd, yyyy")
-            val dateLabel = JLabel(dateFormatter.format(milestone.date), SwingConstants.CENTER)
-            dateLabel.font = Font("Inter", Font.PLAIN, 11)
-            dateLabel.foreground = JBColor.GRAY
-            dateLabel.alignmentX = Component.CENTER_ALIGNMENT
-            panel.add(dateLabel)
-            panel.add(Box.createVerticalStrut(15))
+        val importance = when {
+            milestone.importance > 8 -> "Critical"
+            milestone.importance > 6 -> "Important"
+            else -> "Notable"
         }
-        
-        // Importance badge
-        val importanceBadge = createImportanceBadge(milestone.importance)
-        importanceBadge.alignmentX = Component.CENTER_ALIGNMENT
-        panel.add(importanceBadge)
-        
-        contentPanel.add(panel, BorderLayout.CENTER)
-        
-        // Update progress bar
-        progressBar.value = currentStep + 1
-        
+
+        val column = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
+
+            add(JPanel(BorderLayout()).apply {
+                isOpaque = false
+                alignmentX = Component.LEFT_ALIGNMENT
+                add(VestigeUI.Pill(importance, tone), BorderLayout.WEST)
+            })
+            add(Box.createVerticalStrut(VestigeUI.SpaceMd))
+
+            add(JBLabel(milestone.type.name.replace('_', ' ').lowercase()
+                .replaceFirstChar { it.uppercase() }).apply {
+                font = VestigeUI.titleFont()
+                foreground = VestigeUI.TextPrimary
+                alignmentX = Component.LEFT_ALIGNMENT
+            })
+            add(Box.createVerticalStrut(VestigeUI.SpaceSm))
+
+            add(JTextArea(milestone.content).apply {
+                isEditable = false
+                isFocusable = false
+                lineWrap = true
+                wrapStyleWord = true
+                isOpaque = false
+                border = JBUI.Borders.empty()
+                font = VestigeUI.bodyFont()
+                foreground = VestigeUI.TextPrimary
+                alignmentX = Component.LEFT_ALIGNMENT
+            })
+            add(Box.createVerticalStrut(VestigeUI.SpaceMd))
+
+            val meta = buildString {
+                milestone.author?.let { append(it) }
+                milestone.date?.let {
+                    if (isNotEmpty()) append(" · ")
+                    append(SimpleDateFormat("MMMM d, yyyy").format(it))
+                }
+                milestone.hash?.let {
+                    if (isNotEmpty()) append(" · ")
+                    append(it.take(7))
+                }
+            }
+            if (meta.isNotEmpty()) {
+                add(JBLabel(meta).apply {
+                    font = VestigeUI.captionFont()
+                    foreground = VestigeUI.TextMuted
+                    alignmentX = Component.LEFT_ALIGNMENT
+                })
+            }
+        }
+
+        contentPanel.add(column, BorderLayout.NORTH)
         contentPanel.revalidate()
         contentPanel.repaint()
-    }
-    
-    private fun createImportanceBadge(importance: Int): JLabel {
-        val (text, bgColor, fgColor) = when {
-            importance > 8 -> Triple("🔥 CRITICAL", Color(239, 68, 68, 50), Color(239, 68, 68))
-            importance > 6 -> Triple("⚠️ IMPORTANT", Color(245, 158, 11, 50), Color(245, 158, 11))
-            else -> Triple("📌 NOTABLE", Color(96, 165, 250, 50), Color(96, 165, 250))
-        }
-        
-        val badge = JLabel(text, SwingConstants.CENTER)
-        badge.font = Font("Inter", Font.BOLD, 10)
-        badge.foreground = fgColor
-        badge.background = bgColor
-        badge.isOpaque = true
-        badge.border = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(fgColor, 1),
-            BorderFactory.createEmptyBorder(4, 12, 4, 12)
-        )
-        
-        return badge
     }
 }

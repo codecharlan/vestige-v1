@@ -4,63 +4,65 @@
     <vendor email="support@codecharlan.com" url="https://github.com/codecharlan/vestige-v1">codecharlan</vendor>
 
     <description><![CDATA[
-    Vestige brings <b>temporal awareness</b> directly into your code editor. See which code is ancient, which is churning, and which just changed—all without leaving your file.<br><br>
+    <b>Know what you're about to break.</b><br><br>
 
-    <b>🗿 Vestige - Temporal Code Intelligence</b><br>
-    <i>Uncover the traces of your codebase through time. Certified Master Release.</i><br><br>
+    Vestige reads your local git history and answers the questions that matter right before you change code:
+    what else changes with this file, who actually knows it, and what already constrains it.<br><br>
 
-    <b>🏛️ Core Features:</b>
+    Everything runs on your own machine against your own git history. No account, no sign-in, no telemetry.<br><br>
+
+    <b>What it does</b>
     <ul>
-        <li><b>🗺️ Heatmap Explorer:</b> Files are automatically color-coded based on git history (🔥 High Churn, 🗿 Fossils, ✨ Recent).</li>
-        <li><b>✍️ Inline Temporal Annotations:</b> Tactile editor decorations that reveal history as you code.</li>
-        <li><b>🕰️ Time Travel (Timeline Panel):</b> Complete commit history in a beautiful, lazy-loaded timeline.</li>
-        <li><b>🧠 Code Archaeologist (AI):</b> Hypothesizes why legacy code persists (Load-Bearing Wall, Sunken Treasure, or Zombie).</li>
-        <li><b>📜 Lore System:</b> Capture and preserve architectural decisions directly in your codebase.</li>
-        <li><b>🤝 Onboarding Assistant:</b> AI-powered file history tours for new developers.</li>
-        <li><b>💀 Code Graveyard:</b> Honor deleted code and learn from the past.</li>
+        <li><b>Files that change together.</b> History shows which files keep getting committed alongside the one you're editing, with the shared-commit count so you can judge it yourself. Co-change analysis is well established in research but almost nowhere in an editor.</li>
+        <li><b>Who to ask.</b> If you're changing a file you have little history with, Vestige names the person who has most of it. The count of low-history contributors is the ownership signal with the strongest empirical support for predicting defects.</li>
+        <li><b>History of a selection.</b> Select some lines and see how <i>those lines</i> got that way, not just who touched them last.</li>
+        <li><b>CODEOWNERS that tells the truth.</b> Nothing validates that file. Vestige checks it against real history and reports owners who never committed, owners who have left, and lines the platform silently skips.</li>
+        <li><b>Recovering deleted code.</b> Browse and restore files deleted from the repository, well beyond Local History's window.</li>
+        <li><b>Decisions in context.</b> Architectural decision records surfaced against the code they constrain.</li>
     </ul>
 
-    Experience Zenith Elite Aesthetics with kinetic typography, glassmorphism, and bioluminescent UI indicators.
+    <b>Honest about its numbers</b>
+    <ul>
+        <li>The debt score ranks files <i>within one repository</i>. It is never shown as money or hours — converting an arbitrary score into a currency figure produces a confident number with nothing behind it.</li>
+        <li>Co-change is a suggestion, not a gate. It is shown with its evidence so you can disagree with it.</li>
+        <li>There is no leaderboard and no per-person productivity metric. Vestige reports facts about the codebase, not about people.</li>
+        <li>AI features are optional and off-limits when disabled: setting <code>Disable AI</code> makes those paths unreachable, not merely idle. Answers are always shown next to the commits they were drawn from.</li>
+    </ul>
     ]]></description>
 
     <category>Code tools</category>
 
     <change-notes><![CDATA[
-    <b>Version 1.0.6.2 (Stability & Performance)</b>
+    <b>Version 1.1.0 — Freeze fix, honest metrics, new analysis</b>
     <ul>
-        <li>✨ <b>Critical Stability Fix:</b> Resolved a concurrency issue in the Git Analyzer (HashMap -> ConcurrentHashMap) that caused eventual UI freezes.</li>
-        <li>🛠️ <b>Resource Management:</b> Fixed a file handle leak by properly disposing of JGit repositories on project close.</li>
-        <li>🚀 <b>Performance:</b> Eliminated UI refresh storms with smart 500ms throttling; Heatmaps now load reliably without lagging the editor.</li>
-        <li>🛡️ <b>Scalability:</b> Implemented a configurable, size-limited LRU cache (default 500 files) to prevent memory bloating in large repositories.</li>
-        <li>🧹 <b>Cleanup:</b> VestigeService now rigorously cleans up all background tasks and caches on shutdown.</li>
+        <li><b>Fixed the IDE freezes.</b> The real cause was uncancellable work holding the read lock: a keystroke needs the write lock and waits for every read action to release, which only happens at a cancellation check. The plugin had three. The dominant cost was a duplicate-code scan that compared every extracted pattern against every line window of every other file while recompiling its regexes in the inner loop; it is now an indexed clone detector. Two more paths ran a full tree diff for every commit pair on every tab switch and every save, and the health dashboard issued roughly 250 git calls from a panel constructor.</li>
+        <li><b>Cancellation throughout.</b> Every file, commit and line loop now polls for cancellation, and <code>ProcessCanceledException</code> is rethrown rather than swallowed. History walks, project scans and snapshot storage are all bounded.</li>
+        <li><b>No more periodic re-analysis.</b> Cache validity is keyed on the file's modification stamp instead of wall-clock age, so an idle IDE no longer re-analyses on a timer.</li>
+        <li><b>New: files that change together</b>, with the shared-commit count as evidence.</li>
+        <li><b>New: history of the selected lines</b>, answering how a block got that way rather than who touched it last.</li>
+        <li><b>New: CODEOWNERS audit</b> — reports owners who never committed, owners inactive for six months, and lines the platform silently ignores.</li>
+        <li><b>New: who to ask</b> — surfaces low-history contributors and names the file's main author, replacing the bus-factor score.</li>
+        <li><b>Removed the leaderboard.</b> Ranking colleagues on git-derived statistics is not something this plugin should do.</li>
+        <li><b>Removed invented numbers.</b> The "estimated remediation cost" was a score multiplied by a hardcoded hourly rate; a dashboard percentage and a "from last week" trend had no data behind them at all. All are gone.</li>
+        <li><b>Interface rebuilt.</b> Panels now follow the IDE's own theme and fonts rather than a hardcoded dark palette that was unreadable on light themes, and the tool window builds one panel on open instead of eleven.</li>
+        <li><b>Removed dead subsystems</b> that were unreachable, including one containing unbounded recursion.</li>
     </ul>
-    <b>Version 1.0.6.1 (Zenith Release)</b>
+    <b>Version 1.0.6.2</b>
     <ul>
-        <li>✨ <b>Zenith Upgrade:</b> Re-engineered the core analysis engine for asynchronous, multi-threaded performance. No more UI lag!</li>
-        <li>🎨 <b>Aura Panel:</b> Introduced a premium JCEF-powered dashboard with glassmorphic aesthetics and real-time health metrics.</li>
-        <li>🕰️ <b>Shadow History:</b> New local snapshot system with disk serialization to manage memory while preserving every local edit.</li>
-        <li>🗺️ <b>Recursive Heatmaps:</b> Folder-level heatmap aggregation for high-level repository hotspots.</li>
-        <li>👻 <b>Ghost Overlay:</b> Improved editor HUDs with predictive architectural intent and presence detection.</li>
-        <li>🛠️ <b>SDK Polish:</b> Full compatibility with IntelliJ 2023.2 and resolved all previous build warnings.</li>
+        <li>Bounded the analysis cache and made listener handling thread-safe. Note: this release's notes claimed to have resolved the UI freezes; it did not — the blocking work was untouched. That is fixed in 1.1.0.</li>
+    </ul>
+    <b>Version 1.0.6.1</b>
+    <ul>
+        <li>Asynchronous analysis engine, JCEF dashboard, local snapshot history, folder-level heatmaps.</li>
     </ul>
     <b>Version 1.0.6</b>
     <ul>
-        <li>🚀 <b>Marketplace:</b> Optimized plugin icon (SVG) and expanded feature descriptions.</li>
-        <li>🛠️ <b>Reliability:</b> Fixed <code>InstantiationException</code> in Debt Calculator service.</li>
-        <li>🎨 <b>UI:</b> Improved Project View decorations (badges append to file names).</li>
-    </ul>
-    <b>Version 1.0.5</b>
-    <ul>
-        <li>🚀 <b>Performance:</b> Preliminary optimizations for local analysis.</li>
-    </ul>
-    <b>Version 1.0.4</b>
-    <ul>
-        <li>🧠 Added Centurion Intelligence (AI-powered historical intent).</li>
-        <li>📜 Introduced the Lore System for architectural decision tracking.</li>
+        <li>Marketplace icon, fixed an <code>InstantiationException</code> in the debt calculator, project view badges.</li>
     </ul>
     ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
     <depends>Git4Idea</depends>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -72,44 +74,24 @@
         
         <notificationGroup id="VestigeNotifications" displayType="BALLOON"/>
         
-        <editorLineMarkerProvider language="ANY"
+        <codeInsight.lineMarkerProvider language=""
                                  implementationClass="com.codecharlan.vestige.ui.VestigeLineMarkerProvider"/>
-        
-        <applicationService serviceImplementation="com.codecharlan.vestige.logic.VestigeAIService"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeGitAnalyzer"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeDebtCalculator"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeAchievementService"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeService"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeRewindService"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeLoreService"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeSmartNotifications"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.SentientLoreGenerator"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeSimilarityRadar"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigePredictiveRefactoring"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeSmartNavigation"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeAutoDocumentation"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeHealthScore"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeDependencyImpact"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigePatternDetector"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeCipherPet"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeEchoChamber"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeGhostCursor"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeWormholeService"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeButterflyEffectAnalyzer"/>
-        <projectService serviceImplementation="com.codecharlan.vestige.logic.VestigeLoreBridge"/>
+
+        <!-- Services are registered via the @Service annotation on each class;
+             duplicate projectService/applicationService registrations removed. -->
 
         <projectConfigurable parentId="tools" instance="com.codecharlan.vestige.ui.VestigeSettingsConfigurable"
                             id="com.codecharlan.vestige.settings" displayName="Vestige"/>
         
         <projectViewNodeDecorator implementation="com.codecharlan.vestige.ui.VestigeFileDecorator"/>
-
-        <projectListeners>
-            <listener class="com.codecharlan.vestige.logic.VestigeFileListener"
-                      topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
-            <listener class="com.codecharlan.vestige.logic.VestigeEditorListener"
-                      topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
-        </projectListeners>
     </extensions>
+
+    <projectListeners>
+        <listener class="com.codecharlan.vestige.logic.VestigeFileListener"
+                  topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener class="com.codecharlan.vestige.logic.VestigeEditorListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
 
     <actions>
         <group id="VestigeActionGroup" text="Vestige" popup="true" icon="/META-INF/pluginIcon.svg">
@@ -122,6 +104,12 @@
             </action>
             <action id="Vestige.ShowTimeline" class="com.codecharlan.vestige.ui.ShowTimelineAction"
                     text="Show File Timeline" description="Open the temporal timeline for the current file"/>
+            <action id="Vestige.FindExperts" class="com.codecharlan.vestige.ui.FindExpertsAction"
+                    text="Find Experts for This File"
+                    description="Who has the most history in this file, and is worth asking"/>
+            <action id="Vestige.HandoffRisks" class="com.codecharlan.vestige.ui.ShowHandoffRisksAction"
+                    text="Show Knowledge Handoff Risks"
+                    description="Files many people have touched recently, where no one clearly owns the code"/>
             <action id="Vestige.HistoryQuery" class="com.codecharlan.vestige.ui.HistoryQueryAction"
                     text="Search Project Lore" description="Query historical decisions using natural language"/>
             <action id="Vestige.AddDecision" class="com.codecharlan.vestige.ui.AddDecisionAction"
@@ -130,6 +118,8 @@
                     text="Show Code Evolution" description="Visualize how the project has changed over time"/>
             <action id="Vestige.Rewind" class="com.codecharlan.vestige.ui.RewindAction"
                     text="Rewind Time ⏪" description="Checkout a previous commit to explore history"/>
+            <action id="Vestige.ReturnToPresent" class="com.codecharlan.vestige.ui.ReturnToPresentAction"
+                    text="Return to Present ⏩" description="Check out the branch you were on before rewinding"/>
             <separator/>
             <action id="Vestige.ChatWithGhost" class="com.codecharlan.vestige.ui.ChatWithGhostAction"
                     text="Chat with Ghost 👻" description="Consult the AI about code history"/>

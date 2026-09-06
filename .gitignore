@@ -3,3 +3,17 @@ node_modules/
 .DS_Store
 *.vsix
 
+# Build output
+dist/
+out/
+*.js.map
+
+# Gradle / IntelliJ build junk
+gradle-7.6/
+.gradle/
+intellij/.gradle/
+intellij/build/
+intellij/.sandbox/
+'${rootProject.rootDir}'/
+${rootProject.rootDir}/
+.idea/

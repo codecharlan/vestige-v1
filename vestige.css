@@ -1,148 +1,700 @@
+/* ==========================================================================
+   Vestige — shared webview stylesheet
+
+   Every colour here resolves to a VS Code theme variable, so panels inherit
+   the user's theme (light, dark, high-contrast or custom) instead of shipping
+   their own palette. Panels should compose the `.v-*` components below rather
+   than declaring per-element inline styles.
+   ========================================================================== */
+
 :root {
-    /* Centurion Zenith Elite Tokens */
-    --vestige-green: #10B981;
-    --vestige-amber: #F59E0B;
-    --vestige-red: #EF4444;
-    --vestige-purple: #8B5CF6;
-    --vestige-blue: #3B82F6;
-    --vestige-pink: #F472B6;
+    /* --- Spacing scale ------------------------------------------------- */
+    --v-space-1: 4px;
+    --v-space-2: 8px;
+    --v-space-3: 12px;
+    --v-space-4: 16px;
+    --v-space-6: 24px;
 
-    /* Holographic Mesh Palette */
-    --vestige-hologram-1: #1E293B;
-    --vestige-hologram-2: #334155;
-    --vestige-glow: rgba(59, 130, 246, 0.5);
+    /* --- Radii ---------------------------------------------------------- */
+    --v-radius: 10px;
+    --v-radius-sm: 6px;
+    --v-radius-pill: 999px;
 
-    /* Surface & Glass */
-    --vestige-bg: #0F172A;
-    --vestige-glass: rgba(15, 23, 42, 0.7);
-    --vestige-glass-blur: blur(24px);
-    --vestige-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    /* --- Semantic colour tokens (theme-derived) ------------------------- */
+    --v-bg: var(--vscode-editor-background);
+    --v-surface: var(--vscode-sideBar-background, var(--vscode-editorWidget-background));
+    --v-surface-sunken: var(--vscode-textCodeBlock-background, var(--vscode-editorWidget-background));
+    --v-text: var(--vscode-foreground);
+    --v-text-muted: var(--vscode-descriptionForeground, var(--vscode-foreground));
+    --v-border: var(--vscode-panel-border, var(--vscode-widget-border));
+    --v-border-strong: var(--vscode-widget-border, var(--vscode-panel-border));
+    --v-accent: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+    --v-accent-hover: var(--vscode-textLink-activeForeground, var(--v-accent));
+    --v-focus: var(--vscode-focusBorder);
 
-    /* Elite Shadows & Borders */
-    --vestige-luminous-border: inset 0 0 10px rgba(255, 255, 255, 0.05), 0 0 20px rgba(0, 0, 0, 0.3);
+    --v-good: var(--vscode-charts-green, var(--vscode-testing-iconPassed));
+    --v-warn: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+    --v-bad: var(--vscode-charts-red, var(--vscode-errorForeground));
+    --v-info: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+    --v-alt: var(--vscode-charts-purple, var(--vscode-textLink-foreground));
+
+    /* --- Typography ----------------------------------------------------- */
+    --v-font: var(--vscode-font-family);
+    --v-font-mono: var(--vscode-editor-font-family);
+    --v-fs-title: 20px;
+    --v-fs-metric: 22px;
+    --v-fs-body: 13px;
+    --v-fs-caption: 11px;
 }
 
-/* Base Overhaul */
+/* --- Base ------------------------------------------------------------- */
+
+html {
+    box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: inherit;
+}
+
 body {
-    font-family: 'Inter Variable', 'Inter', sans-serif;
-    background-color: var(--vestige-bg);
-    color: #F8FAFC;
     margin: 0;
-    padding: 24px;
-    overflow-x: hidden;
-    position: relative;
+    padding: 0;
+    font-family: var(--v-font);
+    font-size: var(--v-fs-body);
+    line-height: 1.5;
+    color: var(--v-text);
+    background-color: var(--v-bg);
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Organic Noise Overlay */
-body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
+a {
+    color: var(--v-accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--v-accent-hover);
+    text-decoration: underline;
+}
+
+:focus-visible {
+    outline: 1px solid var(--v-focus);
+    outline-offset: 2px;
+}
+
+/* --- Layout ----------------------------------------------------------- */
+
+.v-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--v-space-6) var(--v-space-6) 48px;
+}
+
+.v-page--flush {
+    max-width: none;
+}
+
+.v-header {
+    margin-bottom: var(--v-space-6);
+}
+
+.v-title {
+    margin: 0;
+    font-size: var(--v-fs-title);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: var(--v-text);
+}
+
+.v-subtitle {
+    margin: var(--v-space-2) 0 0;
+    font-size: var(--v-fs-body);
+    line-height: 1.5;
+    color: var(--v-text-muted);
+    max-width: 76ch;
+}
+
+.v-section {
+    margin-bottom: var(--v-space-6);
+}
+
+.v-section-title {
+    margin: 0 0 var(--v-space-3);
+    font-size: var(--v-fs-caption);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--v-text-muted);
+}
+
+.v-row {
+    display: flex;
+    align-items: center;
+    gap: var(--v-space-3);
+    min-width: 0;
+}
+
+.v-row--between {
+    justify-content: space-between;
+}
+
+.v-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--v-space-2);
+}
+
+.v-spacer {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* --- Card ------------------------------------------------------------- */
+
+.v-card {
+    background: var(--v-surface);
+    border: 1px solid var(--v-border);
+    border-radius: var(--v-radius);
+    padding: var(--v-space-4);
+}
+
+.v-card--tight {
+    padding: var(--v-space-3);
+}
+
+.v-card-title {
+    margin: 0 0 var(--v-space-2);
+    font-size: var(--v-fs-body);
+    font-weight: 600;
+}
+
+/* Left-accent callout, used for warnings and narrative blocks. */
+.v-note {
+    background: var(--v-surface);
+    border: 1px solid var(--v-border);
+    border-left: 3px solid var(--v-accent);
+    border-radius: var(--v-radius-sm);
+    padding: var(--v-space-3) var(--v-space-4);
+    color: var(--v-text);
+}
+
+.v-note--good {
+    border-left-color: var(--v-good);
+}
+
+.v-note--warn {
+    border-left-color: var(--v-warn);
+}
+
+.v-note--bad {
+    border-left-color: var(--v-bad);
+}
+
+/* --- Grid ------------------------------------------------------------- */
+
+.v-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--v-space-3);
+}
+
+.v-grid--wide {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.v-grid--halves {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--v-space-4);
+}
+
+.v-grid > * {
+    min-width: 0;
+}
+
+/* --- Metric ----------------------------------------------------------- */
+
+.v-metric {
+    background: var(--v-surface);
+    border: 1px solid var(--v-border);
+    border-radius: var(--v-radius);
+    padding: var(--v-space-3) var(--v-space-4);
+}
+
+.v-metric-value {
+    display: block;
+    font-size: var(--v-fs-metric);
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    color: var(--v-text);
+}
+
+.v-metric-value--good {
+    color: var(--v-good);
+}
+
+.v-metric-value--warn {
+    color: var(--v-warn);
+}
+
+.v-metric-value--bad {
+    color: var(--v-bad);
+}
+
+.v-metric-value--accent {
+    color: var(--v-accent);
+}
+
+.v-metric-label {
+    display: block;
+    margin-top: var(--v-space-1);
+    font-size: var(--v-fs-caption);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--v-text-muted);
+}
+
+/* --- Badge ------------------------------------------------------------ */
+
+.v-badge {
+    display: inline-block;
+    padding: 2px var(--v-space-2);
+    border-radius: var(--v-radius-sm);
+    border: 1px solid transparent;
+    background: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    font-size: var(--v-fs-caption);
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: baseline;
+}
+
+.v-badge--good,
+.v-badge--warn,
+.v-badge--bad,
+.v-badge--accent {
+    background: transparent;
+}
+
+.v-badge--good {
+    color: var(--v-good);
+    border-color: var(--v-good);
+}
+
+.v-badge--warn {
+    color: var(--v-warn);
+    border-color: var(--v-warn);
+}
+
+.v-badge--bad {
+    color: var(--v-bad);
+    border-color: var(--v-bad);
+}
+
+.v-badge--accent {
+    color: var(--v-accent);
+    border-color: var(--v-accent);
+}
+
+/* --- Buttons ---------------------------------------------------------- */
+
+.v-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--v-space-1);
+    padding: 5px var(--v-space-3);
+    border: 1px solid var(--v-border-strong);
+    border-radius: var(--v-radius-sm);
+    background: var(--vscode-button-secondaryBackground, transparent);
+    color: var(--vscode-button-secondaryForeground, var(--v-text));
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.v-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+    color: var(--vscode-button-secondaryForeground, var(--v-text));
+}
+
+.v-btn:focus-visible {
+    outline: 1px solid var(--v-focus);
+    outline-offset: 2px;
+}
+
+.v-btn--primary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-border, transparent);
+}
+
+.v-btn--primary:hover {
+    background: var(--vscode-button-hoverBackground);
+    color: var(--vscode-button-foreground);
+}
+
+.v-btn--sm {
+    padding: 2px var(--v-space-2);
+    font-size: var(--v-fs-caption);
+}
+
+/* --- Inputs ----------------------------------------------------------- */
+
+.v-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px var(--v-space-3);
+    border: 1px solid var(--vscode-input-border, var(--v-border-strong));
+    border-radius: var(--v-radius-sm);
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-family: inherit;
+    font-size: var(--v-fs-body);
+}
+
+.v-input::placeholder {
+    color: var(--vscode-input-placeholderForeground, var(--v-text-muted));
+}
+
+.v-input:focus-visible {
+    outline: 1px solid var(--v-focus);
+    outline-offset: 0;
+}
+
+.v-range {
+    flex: 1 1 auto;
+    min-width: 0;
     width: 100%;
-    height: 100%;
-    opacity: 0.03;
-    pointer-events: none;
-    background-image: var(--vestige-noise);
-    z-index: 9999;
+    accent-color: var(--v-accent);
+    cursor: pointer;
 }
 
-/* Zenith Elite Card: Holographic + Reactive */
-.zenith-card {
-    background: var(--vestige-glass);
-    backdrop-filter: var(--vestige-glass-blur);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 24px;
-    padding: 24px;
-    position: relative;
+/* --- Meter (progress bar) --------------------------------------------- */
+
+.v-meter {
+    height: 6px;
+    border-radius: var(--v-radius-pill);
+    background: var(--vscode-scrollbarSlider-background);
     overflow: hidden;
-    box-shadow: var(--vestige-luminous-border);
-    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.zenith-card::after {
+.v-meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--v-accent);
+}
+
+.v-meter-fill--good {
+    background: var(--v-good);
+}
+
+.v-meter-fill--warn {
+    background: var(--v-warn);
+}
+
+.v-meter-fill--bad {
+    background: var(--v-bad);
+}
+
+/* --- Table ------------------------------------------------------------ */
+
+.v-table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.v-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--v-fs-body);
+}
+
+.v-table th {
+    padding: var(--v-space-2) var(--v-space-3);
+    text-align: left;
+    font-size: var(--v-fs-caption);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--v-text-muted);
+    border-bottom: 1px solid var(--v-border);
+    white-space: nowrap;
+}
+
+.v-table td {
+    padding: var(--v-space-2) var(--v-space-3);
+    border-bottom: 1px solid var(--v-border);
+    vertical-align: top;
+}
+
+.v-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.v-table .v-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- List rows -------------------------------------------------------- */
+
+.v-list {
+    display: block;
+}
+
+.v-list-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--v-space-3);
+    padding: var(--v-space-2) 0;
+    border-bottom: 1px solid var(--v-border);
+    min-width: 0;
+}
+
+.v-list-row:last-child {
+    border-bottom: none;
+}
+
+.v-list-row-main {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.v-list-row-aside {
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+.v-scroll-y {
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+/* --- Text utilities --------------------------------------------------- */
+
+.v-muted {
+    color: var(--v-text-muted);
+}
+
+.v-caption {
+    font-size: var(--v-fs-caption);
+    color: var(--v-text-muted);
+}
+
+.v-strong {
+    font-weight: 600;
+}
+
+.v-mono {
+    font-family: var(--v-font-mono);
+    font-size: 12px;
+}
+
+.v-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.v-good {
+    color: var(--v-good);
+}
+
+.v-warn {
+    color: var(--v-warn);
+}
+
+.v-bad {
+    color: var(--v-bad);
+}
+
+.v-accent {
+    color: var(--v-accent);
+}
+
+/* --- Code block ------------------------------------------------------- */
+
+.v-code {
+    margin: 0;
+    padding: var(--v-space-3);
+    background: var(--v-surface-sunken);
+    border: 1px solid var(--v-border);
+    border-radius: var(--v-radius-sm);
+    font-family: var(--v-font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow: auto;
+    color: var(--v-text);
+}
+
+.v-code--wrap {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* --- Empty state ------------------------------------------------------ */
+
+.v-empty {
+    background: var(--v-surface);
+    border: 1px dashed var(--v-border-strong);
+    border-radius: var(--v-radius);
+    padding: var(--v-space-6);
+    text-align: center;
+}
+
+.v-empty-title {
+    margin: 0 0 var(--v-space-2);
+    font-size: var(--v-fs-body);
+    font-weight: 600;
+    color: var(--v-text);
+}
+
+.v-empty-text {
+    margin: 0 auto;
+    max-width: 56ch;
+    font-size: var(--v-fs-body);
+    line-height: 1.5;
+    color: var(--v-text-muted);
+}
+
+/* --- Disclosure ------------------------------------------------------- */
+
+.v-details {
+    border: 1px solid var(--v-border);
+    border-radius: var(--v-radius-sm);
+    padding: var(--v-space-2) var(--v-space-3);
+    background: var(--v-surface);
+}
+
+.v-details > summary {
+    cursor: pointer;
+    font-size: var(--v-fs-body);
+    color: var(--v-text-muted);
+}
+
+.v-details > summary:focus-visible {
+    outline: 1px solid var(--v-focus);
+    outline-offset: 2px;
+}
+
+.v-details[open] > summary {
+    margin-bottom: var(--v-space-3);
+    color: var(--v-text);
+}
+
+/* --- Timeline (vertical rail) ----------------------------------------- */
+
+.v-timeline {
+    position: relative;
+    margin: 0;
+    padding: 0 0 0 var(--v-space-6);
+    list-style: none;
+}
+
+.v-timeline::before {
     content: "";
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
-    pointer-events: none;
-    transition: opacity 0.5s;
-    opacity: 0;
+    left: 3px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: var(--v-border);
 }
 
-.zenith-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    border-color: rgba(59, 130, 246, 0.5);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(59, 130, 246, 0.2);
-}
-
-.zenith-card:hover::after {
-    opacity: 1;
-}
-
-/* Kinetic Typography */
-h1,
-h2,
-h3 {
-    font-weight: 900;
-    letter-spacing: -0.05em;
-    background: linear-gradient(135deg, #FFF 0%, #94A3B8 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    transition: font-weight 0.3s ease;
-}
-
-.zenith-card:hover h2 {
-    font-weight: 400;
-    /* Kinetic Weight Shift */
-}
-
-/* Liquid Status Bars */
-.liquid-bar {
-    height: 8px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    overflow: hidden;
+.v-timeline-item {
     position: relative;
+    margin-bottom: var(--v-space-3);
 }
 
-.liquid-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: linear-gradient(90deg, var(--vestige-blue), var(--vestige-purple));
-    box-shadow: 0 0 15px var(--vestige-blue);
-    animation: liquidFlow 3s infinite ease-in-out;
+.v-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * var(--v-space-6) + 1px);
+    top: 14px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--v-accent);
 }
 
-@keyframes liquidFlow {
-
-    0%,
-    100% {
-        transform: scaleX(1);
-        opacity: 0.8;
-    }
-
-    50% {
-        transform: scaleX(1.05);
-        opacity: 1;
-    }
+.v-timeline-item:last-child {
+    margin-bottom: 0;
 }
 
-/* Animated Mesh Gradient Background */
-.mesh-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
+/* --- Chart primitives (inline SVG) ------------------------------------ */
+
+.v-chart {
     width: 100%;
-    height: 100%;
-    z-index: -1;
-    background:
-        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(244, 114, 182, 0.1) 0px, transparent 50%),
-        radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
-    filter: blur(80px);
+    height: auto;
+    display: block;
+}
+
+.v-axis-line {
+    stroke: var(--v-border-strong);
+    stroke-width: 1;
+}
+
+.v-axis-label {
+    fill: var(--v-text-muted);
+    font-family: var(--v-font);
+    font-size: 11px;
+}
+
+.v-value-label {
+    fill: var(--v-text);
+    font-family: var(--v-font);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.v-bar {
+    fill: var(--v-info);
+}
+
+/* --- Overlay label (canvas panels) ------------------------------------ */
+
+.v-overlay {
+    position: absolute;
+    z-index: 2;
+    background: var(--v-surface);
+    border: 1px solid var(--v-border);
+    border-radius: var(--v-radius-sm);
+    padding: var(--v-space-2) var(--v-space-3);
+    max-width: calc(100% - 2 * var(--v-space-6));
+}
+
+.v-overlay--top {
+    top: var(--v-space-4);
+    left: var(--v-space-4);
+}
+
+.v-overlay--bottom {
+    bottom: var(--v-space-4);
+    left: var(--v-space-4);
+}
+
+/* --- Motion ----------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
 }

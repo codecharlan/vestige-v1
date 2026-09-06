@@ -1,5 +1,3 @@
-const path = require('path');
-
 // Mock VS Code
 const mockVscode = require('./mock-vscode');
 

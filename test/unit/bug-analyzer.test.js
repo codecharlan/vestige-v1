@@ -1,5 +1,5 @@
 const assert = require('assert');
-const BugAnalyzer = require('../../bug-analyzer');
+const BugAnalyzer = require('../../dist/bug-analyzer');
 
 suite('BugAnalyzer Test Suite', () => {
     let mockGitAnalyzer;
