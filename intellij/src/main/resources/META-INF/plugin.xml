@@ -33,6 +33,11 @@
     <category>Code tools</category>
 
     <change-notes><![CDATA[
+    <b>Version 1.1.1 — IDE compatibility</b>
+    <ul>
+        <li><b>Fixed:</b> the plugin would not install on IntelliJ IDEA 2025.3, which reported "Not compatible with the version of your running IDE". 1.1.0 declared an upper compatibility bound of build 252, so 2025.3 (build 253) was refused even though the plugin runs correctly on it.</li>
+        <li>The upper bound has been removed rather than nudged forward. The Plugin Verifier finds no internal, experimental or non-extendable platform API usage anywhere in this plugin, so a hardcoded ceiling only ever becomes a wall on the next IDE release. Verified Compatible against builds 232, 252 and 253.</li>
+    </ul>
     <b>Version 1.1.0 — Freeze fix, honest metrics, new analysis</b>
     <ul>
         <li><b>Fixed the IDE freezes.</b> The real cause was uncancellable work holding the read lock: a keystroke needs the write lock and waits for every read action to release, which only happens at a cancellation check. The plugin had three. The dominant cost was a duplicate-code scan that compared every extracted pattern against every line window of every other file while recompiling its regexes in the inner loop; it is now an indexed clone detector. Two more paths ran a full tree diff for every commit pair on every tab switch and every save, and the health dashboard issued roughly 250 git calls from a panel constructor.</li>

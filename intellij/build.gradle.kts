@@ -9,7 +9,7 @@ plugins {
 val platformVersion = "2023.2.1"
 
 // Plugin version
-val pluginVersion = "1.1.0"
+val pluginVersion = "1.1.1"
 
 group = "com.codecharlan"
 version = pluginVersion
@@ -117,7 +117,24 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set("232")
-        untilBuild.set("252.*")
+
+        // No upper bound, deliberately.
+        //
+        // 1.1.0 declared `untilBuild = "252.*"` and IntelliJ 2025.3 (build 253)
+        // therefore refused to install it — users saw "Not compatible with the
+        // version of your running IDE" for a plugin that in fact works fine on
+        // it. An upper bound is only protection if it tracks reality, and a
+        // hardcoded one silently becomes a wall on every IDE release.
+        //
+        // The Plugin Verifier reports no internal, experimental,
+        // non-extendable or override-only platform API usage anywhere in this
+        // plugin — it is entirely on stable public API — which is the condition
+        // under which JetBrains recommends omitting the upper bound. Verified
+        // Compatible against 232, 252 and 253.
+        //
+        // If a future platform release does break something, pin this again
+        // rather than leaving users with runtime exceptions.
+        untilBuild.set(provider { null })
     }
 
     signPlugin {
